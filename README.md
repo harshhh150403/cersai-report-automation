@@ -86,7 +86,8 @@ correct.
 |---|---|
 | The title report may belong to another property (applicant, owners and flat number do not match) | The SI is **held**. Answer `PDF OK` or `WRONG PDF` in Check and correct, then run step 2 again. A held report's values are not used. |
 | An owner is not a borrower (third-party mortgage) | The SI is left out of the `.DAT` file: CERSAI needs asset-owner rows, which the tool does not write yet. File it by hand, or correct the owners if they are in fact borrowers. |
-| An owner's name only probably matches a borrower | Check and correct asks Y/N. The tool assumes Y. |
+| An owner's name only probably matches a borrower (a spelling difference) | The SI is held until someone answers Y or N in Check and correct. One answer covers every collateral of the application with that owner. Names that differ in a given name (relatives sharing a surname) are treated as different people. |
+| Two collaterals of one application seem to have each other's title reports | Both SIs are held; rename the two files and run step 1 again, or answer `WRONG PDF`. |
 | The same property secures another active loan | TYPE_OF_CHARGE is shown as a default to confirm. |
 | A title report file is misnamed, misfiled or scanned (no text) | Listed in the Issues sheet; the file is not used. |
 | CERSAI rejects an SI you already filed | In `Output data/Filed register.xlsx`, change its Status from `Filed` to `Pending` (or delete its row). It will come back in the next batch. |

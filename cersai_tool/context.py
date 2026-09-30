@@ -3,7 +3,8 @@
 A CollateralContext wraps the collateral's LMS bundle, its title report (if
 any) and the values typed in the required-details file. It also works out, once,
 the decisions several columns share:
-  - is the title report usable, and is it the right PDF for this collateral?
+  - is the title report usable, and is it the right PDF for this collateral
+    (and not the report of another collateral of the same application)?
   - who owns the property (LMS owners verified against the title report)?
   - which borrowers are owners, and how many owners are not borrowers?
   - where is the property (PIN -> district -> state -> city)?
@@ -43,8 +44,9 @@ class OwnerLink:
 
 
 class CollateralContext:
-    def __init__(self, bundle, title_report, masters, overrides, serial, run_date):
+    def __init__(self, bundle, title_report, masters, overrides, serial, run_date, siblings=()):
         self.bundle = bundle
+        self.siblings = list(siblings)     # the other collaterals (bundles) of the same application
         self.collateral_id = bundle["collateral_id"]
         self.application_number = bundle["application_number"]
         self.serial = serial
@@ -154,24 +156,52 @@ class CollateralContext:
         if pdf_owners and lms_owners:
             shared = any(name_score(a, b) >= settings.SAME_PERSON_SCORE for a in pdf_owners for b in lms_owners)
             result["checks"].append(("Owners", shared, f"title report {pdf_owners} vs LMS {lms_owners}"))
+        # Flat / unit number: when the report's unit is not in this collateral's
+        # LMS address, it fails only if the LMS address names a unit of its own
+        # (an address without one cannot be compared). A unit that belongs to
+        # another collateral of the same application means the two reports
+        # were probably swapped: that alone holds the SI, because the loan
+        # applicant and often the owners are the same for both.
         pdf_units = rep["details"].get("unit_numbers") or []
         lms_text = f" {normalise_for_compare(self.bundle['property_address'])} "
+        sibling = ""
         if pdf_units and lms_text.strip():
             found = any(f" {normalise_for_compare(u)} " in lms_text for u in pdf_units)
-            result["checks"].append(("Flat/unit number", found,
-                                     f"title report {pdf_units} not in the LMS address" if not found else ""))
+            own_units = self.lms_address.get("unit_numbers") or []
+            if not found:
+                sibling = self._sibling_with_units(pdf_units)
+            if found:
+                result["checks"].append(("Flat/unit number", True, ""))
+            elif own_units or sibling:
+                where = f"; it is the unit of {sibling} of the same application" if sibling else ""
+                result["checks"].append(("Flat/unit number", False, f"title report {', '.join(pdf_units)} vs LMS "
+                                         f"{', '.join(own_units) or 'address'}{where}"))
+        result["sibling"] = sibling
         result["failures"] = sum(1 for _, passed, _ in result["checks"] if not passed)
         released = (self.ov("PDF_CHECK") or "").upper() == PDF_OK
-        if result["failures"] >= settings.RIGHT_PDF_HOLD_FAILURES and not released:
+        if (result["failures"] >= settings.RIGHT_PDF_HOLD_FAILURES or sibling) and not released:
             result["held"] = True
             failed = "; ".join(f"{name}: {detail}" for name, passed, detail in result["checks"] if not passed)
+            what = (f"seems to be the report of {sibling}, another collateral of the same application"
+                    if sibling else "may belong to another property")
             self.issue("hold", "Right PDF check",
-                       f"{rep['file']} may belong to another property ({failed}). The SI is held until "
-                       f"someone types '{PDF_OK}' or '{WRONG_PDF}' in the Check and correct sheet.")
+                       f"{rep['file']} {what} ({failed}). The SI is held until someone types '{PDF_OK}' or "
+                       f"'{WRONG_PDF}' in the Check and correct sheet (or the files are renamed and step 1 is "
+                       "run again).")
         elif result["failures"]:
             failed = "; ".join(f"{name}: {detail}" for name, passed, detail in result["checks"] if not passed)
             self.issue("warning", "Right PDF check", f"one check failed for {rep['file']}: {failed}")
         return result
+
+    def _sibling_with_units(self, units) -> str:
+        """The other collateral of this application whose LMS address names
+        one of these unit numbers, or ''."""
+        keys = {normalise_for_compare(u).replace(" ", "") for u in units}
+        for other in self.siblings:
+            other_units = parse_property_address(other["property_address"]).get("unit_numbers") or []
+            if keys & {normalise_for_compare(u).replace(" ", "") for u in other_units}:
+                return other["collateral_id"]
+        return ""
 
     # -- owners ------------------------------------------------------------
     @property
@@ -229,7 +259,25 @@ class CollateralContext:
                     probable = True
             links.append(OwnerLink(owner, borrower["neo_cif"] if borrower else "",
                                    borrower["name"] if borrower else "", score, probable))
+        unsure = [link for link in links if link.probable]
+        if unsure:
+            pairs = "; ".join(f"owner '{l.owner}' = borrower '{l.borrower_name}'?" for l in unsure)
+            self.issue("hold", "Owner names", f"only probably the same person ({pairs}). The SI is held until "
+                                              "someone answers Y or N (OWNER_MATCH) in the Check and correct sheet.")
         return links
+
+    @property
+    def hold_reasons(self) -> list:
+        """Why this SI must stay out of the .DAT file until someone answers a
+        question in the required-details file (empty when it may go)."""
+        reasons = []
+        if self.right_pdf["held"]:
+            reasons.append("the title report may belong to another property (answer PDF_CHECK)")
+        unsure = [link for link in self.owner_links if link.probable]
+        if unsure:
+            names = ", ".join(f"'{l.owner}'" for l in unsure)
+            reasons.append(f"owner name {names} only probably matches a borrower (answer OWNER_MATCH)")
+        return reasons
 
     def non_borrower_owners(self) -> list:
         return [link.owner for link in self.owner_links if not link.neo_cif]

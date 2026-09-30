@@ -84,7 +84,7 @@ def summarise(blocks, log):
     log(f"  values still needed or to confirm: {needed}")
     log(f"  LMS / title report differences:    {conflicts}")
     if held:
-        log(f"  held (title report may be for another property): {short_list(held)}")
+        log(f"  held until a question in Check and correct is answered: {short_list(held)}")
     if tpm:
         log(f"  third-party mortgages (left out of the .DAT file): {short_list(tpm)}")
 
@@ -94,8 +94,12 @@ def run(paths, log=print, today=None):
     log("Reading the CERSAI masters...")
     masters = Masters(paths.masters_file)
     log("Reading CKYC and COLLATERAL...")
-    bundles, notes, info = lms.load_bundles(paths)
-    log(f"  {len(bundles)} active collateral(s) in {Path(info['collateral_file']).name}")
+    bundles, notes, info, known = lms.load_bundles(paths)
+    applications = len({b["application_number"] for b in bundles})
+    log(f"  {len(bundles)} active collateral(s) of {applications} application(s) in "
+        f"{Path(info['collateral_file']).name}")
+    for note in notes:
+        log(f"  note: {note}")
 
     register = batches.load_register(paths.register_file)
     skipped, kept = [], []
@@ -118,7 +122,7 @@ def run(paths, log=print, today=None):
     folder = batches.new_batch(paths.output_folder, today)
     log(f"New batch: {folder}")
     active_ids = {b["collateral_id"]: b["application_number"] for b in kept}
-    found, pdf_problems = title_report.index_folder(paths.legal_folder, active_ids)
+    found, pdf_problems = title_report.index_folder(paths.legal_folder, active_ids, known)
     log(f"Reading {len(found)} title report(s)...")
     reports = {}
     for coll, path in found.items():

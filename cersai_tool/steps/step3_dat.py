@@ -101,7 +101,10 @@ def run(paths, batch_name=None, assume_yes=False, log=print, moment=None):
     for problem in sheet["problems"]:
         log(f"  problem: {problem}")
     register = batches.load_register(paths.register_file)
-    results = check_batch(sheet, masters, set(data.get("held", [])), register, batches.FILED)
+    held = data.get("held", {})
+    if isinstance(held, list):          # batches made before hold reasons were recorded
+        held = {coll: "the title report may belong to another property (answer PDF_CHECK)" for coll in held}
+    results = check_batch(sheet, masters, held, register, batches.FILED)
     for r in results:
         for label, field, text in data.get("notices", {}).get(r.collateral_id, []):
             r.warnings.append((label, field, f"{text} (see the Issues sheet of the final Excel)"))

@@ -227,11 +227,22 @@ def build_applications():
                                "House No. 1-9-374 and 1-9-375 admeasuring 222.96 sq.mtr built up area consisting of "
                                "ground and first floors constructed on the land bearing Survey No. 45/A situated at "
                                "Kushaiguda, Kapra Village, Kapra Mandal, Medchal-Malkajgiri District, Hyderabad 500 062",
-                               mortgage="Registered Mortgage", status="Positive"))],
+                               mortgage="Registered Mortgage", status="Positive")),
+         collateral("COLL00090033", "CMS00090033", "PLOT",
+                    "Plot No. 17, Survey No. 212/2, Sai Enclave, Keesara Village, Keesara Mandal, Medchal-Malkajgiri "
+                    "District, Hyderabad, Telangana- 501301, India", "501301", [("Salma Begum", 100)], carpet=2250,
+                    purpose="Vacant",
+                    pdf=report("A", "Mohd Irfan", "Smt. Salma Begum",
+                               "Open Plot No. 17, adm. 209.03 Sq. Mtrs., Plot area, in the layout known as Sai "
+                               "Enclave, bearing Survey No. 212/2, situated at Keesara Village, Keesara Mandal, "
+                               "Medchal-Malkajgiri District, Telangana 501 301.", nature="Residential Open Plot.",
+                               mortgage="Registered Mortgage"))],
         [loan(900401, "A", "03-AUG-26", 7200000)],
-        case="Two house numbers ('H.No. 1-9-374 and 1-9-375' -> 1-9-374/1-9-375); customer with constitution "
-             "'NO PAN' and only a Voter's ID (CKYC number needed); no mobile in CKYC, so COLLATERAL PHONE_NUMBER is "
-             "used; title report says Registered Mortgage (SI type 18); area in sq. m close to the built-up area."))
+        case="Two collaterals: the house is owned by both borrowers, the plot by one of them (Salma Begum) - so "
+             "IS_ASSET_OWNER differs between the two SIs. Two house numbers ('H.No. 1-9-374 and 1-9-375' -> "
+             "1-9-374/1-9-375); customer with constitution 'NO PAN' and only a Voter's ID (CKYC number needed); no "
+             "mobile in CKYC, so COLLATERAL PHONE_NUMBER is used; both title reports say Registered Mortgage (SI "
+             "type 18); the plot's title report says 'Residential', so the PLOT is asset type 1."))
 
     # D05 - PLOT with a title report that says it is residential.
     apps.append(application(
@@ -298,11 +309,22 @@ def build_applications():
                     pdf=report("B", "Aarav Infra Projects Pvt. Ltd.", "Mr. Deepak Kumar Verma and Mrs. Pooja Verma",
                                "Flat No. 704 admeasuring 1150 Sq. Ft. super area on the 7th floor in Tower B-2 of the "
                                "project known as Gaur Green Avenue constructed on the land bearing Khasra No. 1245 "
-                               "situated at Village Makanpur, Abhay Khand, Indirapuram, District Ghaziabad"))],
+                               "situated at Village Makanpur, Abhay Khand, Indirapuram, District Ghaziabad")),
+         collateral("COLL00090034", "CMS00090034", "COMMERCIAL",
+                    "Office No. 305, 3rd Floor, Ansal Plaza, Plot No. 4, Vaishali Sector 1, Ghaziabad, Uttar "
+                    "Pradesh- 201010, India", "201010", [("Aarav Infra Projects Pvt Ltd", 100)], built=720,
+                    carpet=600, purpose="Self Occupied",
+                    pdf=report("B", "Aarav Infra Projects Pvt. Ltd.", "M/s. Aarav Infra Projects Private Limited",
+                               "Office No. 305 admeasuring 55.74 sq.mtr carpet area on the 3rd floor in the building "
+                               "known as Ansal Plaza of the project known as Ansal Plaza constructed on the land "
+                               "bearing Plot No. 4 situated at Vaishali Sector 1, District Ghaziabad",
+                               nature="Commercial"))],
         [loan(900701, "A", "14-AUG-26", 5200000)],
-        case="Private limited company with its CIN in CKYC; office and alternate business addresses; e-mail with a "
-             "hyphen in CKYC, valid one in COLLATERAL (used); plot number from the LMS address and khasra (survey) "
-             "number from the title report; title-report area matches the built-up area, not the carpet area."))
+        case="Two collaterals with different owners: the flat belongs to the two directors, the office to the "
+             "company itself ('Private Limited' in the title report = 'Pvt Ltd' in COLLATERAL). Private limited "
+             "company with its CIN in CKYC; office and alternate business addresses; e-mail with a hyphen in CKYC, "
+             "valid one in COLLATERAL (used); plot number from the LMS address and khasra (survey) number from the "
+             "title report; title-report area matches the built-up area, not the carpet area."))
 
     # D08 - Haryana revenue numbers; area only in the title report; PIN in two districts.
     apps.append(application(
@@ -419,11 +441,21 @@ def build_applications():
                                "Wing of the building known as Rukmini Vaibhav of the Society known as 'Rukmini Vaibhav "
                                "Co-operative Housing Society Ltd.', constructed on land bearing C.T.S. No. 781, 781/1 "
                                "to 781/5 of Village Andheri, Taluka Andheri, Veera Desai Road, Azad Nagar, Andheri "
-                               "(West), Mumbai 400058", status="Positive"))],
+                               "(West), Mumbai 400058", status="Positive")),
+         collateral("COLL00090035", "CMS00090035", "COMMERCIAL",
+                    "Shop No. 4, Ground Floor, Joshi Arcade, S. V. Road, Andheri West, Mumbai, Maharashtra- 400058, "
+                    "India", "400058", [], built=450, carpet=380, purpose="Rented",
+                    pdf=report("A", "Mahesh Chandra Joshi", "Mr. Mahesh C. Joshi",
+                               "Shop No. 4 on the Ground Floor, adm. 35.30 Sq. Mtrs., Carpet area, in the building "
+                               "known as \u2018Joshi Arcade\u2019, constructed on land bearing C.T.S. No. 812, "
+                               "situated at Village Andheri, Taluka Andheri, S. V. Road, Andheri (West), Mumbai "
+                               "400 058.", nature="Commercial."))],
         [loan(901201, "A", "01-AUG-26", 15000000)],
-        case="Two flats in one collateral ('Flat No. 1301 & 1302' -> 1301/1302); four owners at 25% each with "
-             "Mr/Mrs/Ms; a guarantor; CKYC First Disbursal Date differs from COLLATERAL Disbursal Date (CKYC "
-             "used); a 2-digit birth year that is 20YY (15-MAR-05 -> 2005)."))
+        case="Two collaterals: the flats are owned by all four borrowers, the shop by one of them - and COLLATERAL "
+             "has no owner rows for the shop, so its owner comes from its title report. Two flats in one "
+             "collateral ('Flat No. 1301 & 1302' -> 1301/1302); four owners at 25% each with Mr/Mrs/Ms; a "
+             "guarantor; CKYC First Disbursal Date differs from COLLATERAL Disbursal Date (CKYC used); a 2-digit "
+             "birth year that is 20YY (15-MAR-05 -> 2005)."))
 
     # D13 - one application, two collaterals, an active and a cancelled loan account.
     pune_home = "Row House No. 7, Shubh Kalyan Society, Wakad, Pune, Maharashtra- 411057, India"
@@ -464,8 +496,9 @@ def build_applications():
         [collateral("COLL00090016", "CMS00090099", "COMMERCIAL", express_zone, "400097", [("Harish Mehta", 100)],
                     built=900, carpet=760, purpose="Rented")],
         [loan(901401, "A", "15-JUL-26", 11000000)],
-        case="Property also secures APPL00090015 (same Global collateral No): TYPE_OF_CHARGE needs confirming; "
-             "single borrower; the city is MALAD (more specific than the general 'Mumbai')."))
+        case="The same property (same Global collateral No) also secures APPL00090015, recorded there under its "
+             "own Collateral ID (a Collateral ID belongs to one application only): TYPE_OF_CHARGE needs "
+             "confirming; single borrower; the city is MALAD (more specific than the general 'Mumbai')."))
     apps.append(application(
         "APPL00090015", "Mumbai 3", "20-08-2026",
         [firm(90151, "MEHTA TRADING CO.", "Partnership Firm", "primary", "12-DEC-01", "AAAFM3434N",
@@ -474,8 +507,8 @@ def build_applications():
         [collateral("COLL00090017", "CMS00090099", "COMMERCIAL", express_zone, "400097", [("Harish Mehta", 100)],
                     built=900, carpet=760, purpose="Rented")],
         [loan(901501, "A", "20-AUG-26", 5000000)],
-        case="Second loan on the same property as APPL00090014 (TYPE_OF_CHARGE to confirm); the same customer "
-             "(same Neo CIF ID) on two applications."))
+        case="Second loan on the same property as APPL00090014, with its own Collateral ID (TYPE_OF_CHARGE to "
+             "confirm); the same customer (same Neo CIF ID) on two applications."))
 
     # D16 - cancelled only; D17 - closed only: both left out.
     apps.append(application(
@@ -570,10 +603,15 @@ def build_applications():
                                                   "500081, India")])],
         [collateral("COLL00090024", "CMS00090024", "RESIDENTIAL",
                     "Flat No. 202, 2nd Floor, Sri Sai Residency, Plot No. 18 & 19, Survey No. 112, Madhapur, "
-                    "Hyderabad, Telangana- 500081, India", "500081", [("Smt. Banu K", 100)], built=1250, carpet=1050)],
+                    "Hyderabad, Telangana- 500081, India", "500081", [("Smt. Banu K", 100)], built=1250, carpet=1050),
+         collateral("COLL00090036", "CMS00090036", "RESIDENTIAL",
+                    "Flat No. 305, 3rd Floor, Sri Sai Residency, Plot No. 18 & 19, Survey No. 112, Madhapur, "
+                    "Hyderabad, Telangana- 500081, India", "500081", [("Smt. Banu K", 100)], built=1250, carpet=1050,
+                    purpose="Rented")],
         [loan(902101, "A", "19-AUG-26", 5600000)],
-        case="Owner 'Smt. Banu K' only probably matches borrower 'BHANU KATAM': the Check and correct sheet asks "
-             "Y/N; both survey and plot numbers in the address; no title report."))
+        case="Two flats with the same owner 'Smt. Banu K', who only probably matches borrower 'BHANU KATAM': the "
+             "Check and correct sheet asks Y/N once, and the answer is used for both collaterals; both survey and "
+             "plot numbers in the address; no title reports."))
 
     # D22 - the title report belongs to a different property: SI held.
     apps.append(application(
@@ -742,6 +780,96 @@ def build_applications():
         [loan(902901, "A", "04-SEP-26", 7800000)],
         case="Old and new survey numbers with Hissa (only the new one is used: 12/2); three owners at "
              "33.33/33.33/33.34%; the title report lists 'A, B and C' with full names."))
+
+    # D30 - one application, five collaterals: the owners are the same on two, a subset on one, a different
+    # combination on one, and one collateral has an owner who is not a borrower.
+    sawant_home = "Flat No. 802, 8th Floor, Neelkanth Heights, Pokharan Road No. 2, Thane West, Thane, Maharashtra- " \
+                  "400610, India"
+    apps.append(application(
+        "APPL00090030", "Thane", "16-09-2026",
+        [person(90301, "VINOD RAMCHANDRA SAWANT", "primary", "14-JUL-72", "AXSPS3031K",
+                email="vinod.sawant72@gmail.com", addresses=[("ResidentialAddress", sawant_home)]),
+         person(90302, "MEGHA VINOD SAWANT", "Co-Applicant", "22-MAR-76", "BYSPS3032L",
+                addresses=[("ResidentialAddress", sawant_home)]),
+         firm(90303, "SAWANT ELECTRICALS", "Sole Proprietorship Firm", "Co-Applicant", "01-APR-05", "AXSPS3031K",
+              addresses=[("OfficeAddress", "Shop No. 6, Ground Floor, Gokul Arcade, Station Road, Naupada, Thane West, "
+                                           "Thane, Maharashtra- 400601, India")]),
+         person(90304, "RAMCHANDRA GANPAT SAWANT", "Co-Applicant", "03-JAN-48", "ACSPS3034M",
+                addresses=[("ResidentialAddress", sawant_home)])],
+        [collateral("COLL00090037", "CMS00090037", "RESIDENTIAL",
+                    "Flat No. 802, 8th Floor, B Wing, Neelkanth Heights CHS Ltd, Pokharan Road No. 2, Vasant Vihar, "
+                    "Thane West, Thane, Maharashtra- 400610, India", "400610",
+                    [(" Mr. Vinod Ramchandra Sawant", 50), ("Mrs. Megha Vinod Sawant", 50)], built=1000, carpet=840,
+                    classification="Residential Flat",
+                    pdf=report("B", "Vinod Ramchandra Sawant", "Mr. Vinod R. Sawant and Mrs. Megha V. Sawant",
+                               "Flat No. 802 admeasuring 78.04 sq.mtr carpet area on the 8th floor in B Wing of the "
+                               "building known as Neelkanth Heights of the Society known as 'Neelkanth Heights "
+                               "Co-operative Housing Society Ltd.', constructed on the land bearing Survey No. 101/1 "
+                               "of Village Majiwade, Taluka and District Thane", initiated="02/09/2026",
+                               issued="05/09/2026; 09/09/2026")),
+         collateral("COLL00090038", "CMS00090038", "COMMERCIAL",
+                    "Shop No. 6, Ground Floor, Gokul Arcade, Station Road, Naupada, Thane West, Thane, Maharashtra- "
+                    "400601, India", "400601", [("Vinod Ramchandra Sawant", 100)], built=300, carpet=250,
+                    purpose="Self Occupied",
+                    pdf=report("A", "Vinod Ramchandra Sawant", "Mr. Vinod R. Sawant",
+                               "Shop No. 6 on the Ground Floor, adm. 23.23 Sq. Mtrs., Carpet area, in the building "
+                               "known as \u2018Gokul Arcade\u2019, constructed on land bearing C.T.S. No. 45/2, "
+                               "situated at Village Naupada, Taluka and District Thane, Station Road, Thane (West) "
+                               "400 601.", nature="Commercial.")),
+         collateral("COLL00090039", "CMS00090039", "RESIDENTIAL",
+                    "Flat No. 101, 1st Floor, Sai Shraddha Apartment, Near Kopri Bridge, Kopri Colony, Thane East, "
+                    "Thane, Maharashtra- 400603, India", "400603", [("Mr. Vinod Sawant", 50), ("Mrs. Megha Sawant", 50)],
+                    built=650, carpet=540, purpose="Rented"),
+         collateral("COLL00090040", "CMS00090040", "INDUSTRIAL",
+                    "Gala No. 14, 1st Floor, Shree Ganesh Industrial Estate, Survey No. 36, Village Pimpri, Bhiwandi, "
+                    "Thane, Maharashtra- 421302, India", "421302",
+                    [("Megha Vinod Sawant", 50), ("Ramchandra Ganpat Sawant", 50)], built=1500, carpet=1350,
+                    purpose="Rented",
+                    pdf=report("A", "Vinod Ramchandra Sawant", "Mrs. Megha V. Sawant & Mr. Ramchandra G. Sawant",
+                               "Gala No. 14 on the 1st Floor, adm. 125.42 Sq. Mtrs., Carpet area, in the building "
+                               "known as \u2018Shree Ganesh Industrial Estate\u2019, constructed on land bearing "
+                               "Survey No. 36, situated at Village Pimpri, Taluka Bhiwandi, District Thane.",
+                               nature="Industrial.")),
+         collateral("COLL00090041", "CMS00090041", "PLOT",
+                    "Plot No. 23, Gat No. 118, Village Shahapur, Taluka Shahapur, Thane, Maharashtra- 421601, India",
+                    "421601", [("Vinod Ramchandra Sawant", 50), ("Sunanda Ramchandra Sawant", 50)], carpet=5400,
+                    nature="GRAM PANCHAYAT", purpose="Vacant")],
+        [loan(903001, "A", "16-SEP-26", 18500000)],
+        case="One application, five collaterals, one loan (each SI carries the full sanctioned amount). Owners: "
+             "the same two borrowers on COLL00090037 and COLL00090039 (written differently in COLLATERAL); only "
+             "Vinod on COLL00090038; Megha with her father-in-law Ramchandra on COLL00090040; Vinod with his mother "
+             "Sunanda - not a borrower - on COLL00090041, which alone becomes a third-party mortgage and is left "
+             "out, while the other four are filed. IS_ASSET_OWNER of each borrower differs from SI to SI. The "
+             "proprietorship shares Vinod's PAN. Three of the five collaterals have title reports."))
+
+    # D31 - two flats of one application whose title reports were saved under each other's names.
+    kulkarni_home = "Flat No. 101, Sai Krupa Apartment, Karve Nagar, Pune, Maharashtra- 411052, India"
+    report_101 = ("Flat No. 101 on the 1st Floor, adm. 60.39 Sq. Mtrs., Carpet area, in the Society known as "
+                  "\u2018Sai Krupa Co-op. Hsg. Soc. Ltd.\u2019, constructed on land bearing S. No. 14/2, situated at "
+                  "Karve Nagar, Taluka Haveli, District Pune.")
+    report_202 = report_101.replace("Flat No. 101 on the 1st Floor", "Flat No. 202 on the 2nd Floor")
+    apps.append(application(
+        "APPL00090031", "Pune", "08-09-2026",
+        [person(90311, "ASHOK BHIKAJI KULKARNI", "primary", "19-FEB-70", "ALKPK3111N",
+                addresses=[("ResidentialAddress", kulkarni_home)]),
+         person(90312, "SEEMA ASHOK KULKARNI", "Co-Applicant", "07-AUG-74", "BMKPK3112P",
+                addresses=[("ResidentialAddress", kulkarni_home)])],
+        [collateral("COLL00090042", "CMS00090042", "RESIDENTIAL",
+                    "Flat No. 101, 1st Floor, Sai Krupa Apartment, S. No. 14/2, Karve Nagar, Pune, Maharashtra- "
+                    "411052, India", "411052", [("Ashok Bhikaji Kulkarni", 50), ("Seema Ashok Kulkarni", 50)],
+                    built=780, carpet=650,
+                    pdf=report("A", "Ashok Kulkarni", "Mr. Ashok B. Kulkarni & Mrs. Seema A. Kulkarni", report_202)),
+         collateral("COLL00090043", "CMS00090043", "RESIDENTIAL",
+                    "Flat No. 202, 2nd Floor, Sai Krupa Apartment, S. No. 14/2, Karve Nagar, Pune, Maharashtra- "
+                    "411052, India", "411052", [("Ashok Bhikaji Kulkarni", 50), ("Seema Ashok Kulkarni", 50)],
+                    built=780, carpet=650, purpose="Rented",
+                    pdf=report("A", "Ashok Kulkarni", "Mr. Ashok B. Kulkarni & Mrs. Seema A. Kulkarni", report_101))],
+        [loan(903101, "A", "08-SEP-26", 6400000)],
+        case="Two flats of one application whose title reports were swapped when saved (the report named for flat "
+             "101 describes flat 202, and the other way round). The loan applicant and the owners match for both, "
+             "so only the flat number gives it away: because it is the flat of the other collateral of the same "
+             "application, both SIs are held until someone answers PDF OK / WRONG PDF (or renames the files and "
+             "runs step 1 again)."))
     return apps
 
 
@@ -749,8 +877,6 @@ def build_applications():
 EXTRA_PDFS = [
     ("APPL00090027_COLL0009030.pdf", "APPL00090027", "COLL00090030",
      "misnamed: the collateral ID has 7 digits (reported; the collateral is treated as having no title report)"),
-    ("APPL00090001_COLL00090002.pdf", "APPL00090002", "COLL00090002",
-     "misfiled: COLL00090002 belongs to APPL00090002, not APPL00090001 (reported)"),
     ("Title report APPL00090021.pdf", "APPL00090021", "COLL00090024",
      "a name that does not follow <APPL>_<COLL>.pdf (reported)"),
 ]
@@ -1081,6 +1207,9 @@ def main():
     lines = ["# Dummy data cases", "",
              "Made by `dev_tools/make_dummy_data.py`. All names, PANs, phone numbers, e-mails and law firms are "
              "made up; PIN codes and place names are real. Run the tool on this data with `--dummy`.", "",
+             "As in the LMS, an application can have several collaterals (one loan secured by several properties), "
+             "but a Collateral ID belongs to one application only. Borrowers are per application; owners are per "
+             "collateral and can be the same, different, or overlap between the collaterals of one application.", "",
              "| Application | Collateral(s) | What it tests |", "|---|---|---|"]
     for a in apps:
         colls = ", ".join(c["coll"] for c in a["collaterals"])

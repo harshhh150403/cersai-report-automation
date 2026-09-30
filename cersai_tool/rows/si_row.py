@@ -59,7 +59,11 @@ def col_03_number_of_borrowers(c, row):
 # Rules: each owner is matched to a borrower by name (titles like Mr/Mrs/Smt
 #   and spelling differences are ignored; initials match whole names). This
 #   column counts the owners who are NOT borrowers. 0 when every owner is a
-#   borrower. Close-but-uncertain name matches are listed for confirmation.
+#   borrower. A name that only probably matches a borrower (a spelling
+#   difference) is counted as that borrower, but the SI is held until someone
+#   confirms it (Y/N in the Check and correct sheet). Names that differ in a
+#   given name are different people, even when the surname and the father's or
+#   husband's name are the same (relatives).
 # If it can't be found: no owners in either source -> reported as missing;
 #   owner names can be typed in the required-details file.
 def col_04_number_of_asset_owners(c, row):

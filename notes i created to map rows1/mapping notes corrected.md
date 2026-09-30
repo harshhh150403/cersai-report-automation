@@ -34,7 +34,13 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - Current extract: 1,150 applications and **1,312 collaterals**.
   - All other steps, including the borrower lists from CKYC, use only the applications that remain after this filter.
 - **Batch size** = number of unique active Collateral IDs in the file. **A file can hold at most 1000 collaterals.** The current extract has 1,312, so it must be split into 2 files, each with its own Row 1.
-- **One Collateral ID = one SI block** (Row 2 down to the last row below). Each Collateral ID belongs to exactly one application.
+- **One Collateral ID = one SI block** (Row 2 down to the last row below).
+- **An application can have several collaterals, but a Collateral ID belongs to one application only** (116 applications have 2–8 collaterals; no Collateral ID appears under two applications).
+  - Each collateral of an application gets its own SI block, with the same borrowers (BOR rows, from the application) and the full sanctioned amount of the loan.
+  - The owners are worked out per collateral. They can be the same on every collateral, different, or overlapping, so IS_ASSET_OWNER, the owner count and IS_TPM can differ between the SIs of one application.
+  - The SI blocks of one application are written one after the other.
+  - If COLLATERAL ever lists a Collateral ID under two applications, that is a data error: the collateral is left out and reported until the LMS is corrected.
+  - The same property can secure two applications only under two different Collateral IDs (same `Global collateral No`; see SI Column 13).
 - **Date format everywhere is `yyyy-mm-dd`**, written as **text**. If Excel stores a date as a date, the concatenated output shows a serial number such as `38169`.
 - **Output:**
   - The Excel file is the review copy. The upload file is a pipe-separated `.DAT` text file built from the same values.
@@ -73,15 +79,21 @@ The counts quoted below come from the current LMS extract, active loans only. Th
 - **File names use the exact IDs from COLLATERAL.xlsx:** `APPL` + 8 digits and `COLL` + 8 digits (e.g. `COLL00266688`).
 - **How to link a PDF to its rows:**
   1. Split the file name into the application number and the Collateral ID.
-  2. Find that Collateral ID among the active collaterals (`Loan Status = A`). It must match exactly; if it doesn't, flag the PDF (for example a typo in the name, or a loan that isn't active).
-  3. Check that the collateral belongs to the application in the file name. If not, flag the PDF as misfiled.
+  2. Find that Collateral ID in COLLATERAL. It must match exactly; if COLLATERAL doesn't have it, flag the PDF (for example a typo in the name).
+  3. Check that the collateral belongs to the application in the file name. A collateral belongs to one application only, so if COLLATERAL lists it under another application, flag the PDF as misfiled (rename it).
+
+     The Legal folder keeps the PDFs of earlier days: a PDF of a collateral that is not in the current batch (filed earlier, or not active) is ignored, even when another collateral of the same application is in the batch.
   4. List the active collaterals that have no PDF. Their values come from the input data as normal; the type of mortgage defaults to `17`, and any remaining gaps go to the required-details file.
   5. **Check it's the right PDF** before taking any value from it (otherwise a misnamed PDF would fill gaps with another property's details):
      - "Loan applicant" ≈ the CKYC primary borrower;
      - owners (item 4) ≈ COLLATERAL `Owner Name`;
      - the flat/shop number in item 1 appears in COLLATERAL `Full Address`.
 
-     If 2 or more checks fail, hold the SI until someone answers `PDF OK` or `WRONG PDF` in the required-details file. While the SI is held, **no value is taken from that PDF**. The owner comparison is also the owner check described in SI Column 4. Apart from the owners, these checks only verify the file; they never replace an input-data value.
+     The flat/shop check counts as failed only when the COLLATERAL address names a unit of its own.
+
+     If 2 or more checks fail, hold the SI until someone answers `PDF OK` or `WRONG PDF` in the required-details file. While the SI is held, **no value is taken from that PDF**.
+
+     **Reports swapped between two collaterals of one application:** these share the loan applicant and often the owners, so only the flat/shop number gives it away. If the unit in the PDF is not this collateral's but is the unit of another collateral of the same application, hold the SI whatever the other checks say, naming that collateral (rename the two files, or answer `WRONG PDF`). The owner comparison is also the owner check described in SI Column 4. Apart from the owners, these checks only verify the file; they never replace an input-data value.
 - **What the report looks like:** a "TITLE REPORT" from the advocate with a header (Status, dates), a box with "Loan applicant" and "Property Owner", and a numbered table. The items used here:
   - **Item 1 — Full Description of the property:** flat/shop number, floor, area and unit, society/project, building, survey/Hissa/plot numbers, village, district (a PIN only sometimes). Used for any of these the input data lacks.
   - **Item 2 — Nature of immovable property:** Residential / Commercial. Used only for `PLOT` properties.
@@ -120,19 +132,24 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - **Owners are checked against the title report.** Read both lists:
     - COLLATERAL `Owner Name` (the distinct names on this collateral's active rows);
     - the title report's **item 4 "Name of the owner"** (e.g. `Mr. A & Mrs. B`, `A, B and C`). Split it on `,`, `&` and `and`, but keep company names such as `X AND COMPANY` whole; then remove `Mr.`/`Mrs.`/`Dr.`/`Smt.`. If the report's header box or item 12 names different owners from item 4, flag the report.
-  - Compare the two lists, normalising names as described below (a close fuzzy match counts as the same person):
+  - Compare the two lists, comparing names as described below:
     - **same owners** → use them (verified);
     - **COLLATERAL has no owners** (37 collaterals) → use the title report's owners;
     - **the lists differ** (different names, or a different number of owners) → use the title report's owners, because the title report is the legal record of ownership, and flag the collateral for review. If another right-PDF check also fails, hold the SI instead: it may be the wrong PDF;
     - **no usable title report** → use COLLATERAL's owners, marked "not verified";
     - **neither source has owners** → typed in the required-details file.
-  - Work owners out **per collateral**: two collaterals of the same loan can have different owners.
+  - Work owners out **per collateral**: the collaterals of one application can have the same owners, different owners, or some owners in common.
   - Match each owner to the borrowers kept in Column 3. An exact text match is not enough: in the LMS data only 798 of 1,636 owner names match a `Customer Name` exactly. Owner names carry `Mr.`/`Mrs.`/`Smt.`, leading spaces, different case and spelling variants (`MR. PREM MATA SEVAK MISHRA` vs `PREM MATASEVAK MISHRA`).
-  - Before comparing, on both sides: upper-case; remove `MR`, `MRS`, `MS`, `SMT`, `SHRI`, `DR`, `M/S` and punctuation; collapse spaces; treat `PVT LTD` and `PRIVATE LIMITED` as the same; let an initial (`G`) match any word starting with that letter.
-  - Then compare:
-    - an exact normalised match counts as a borrower (1,188 LMS owners);
-    - a close fuzzy match (about 284 more) counts as the borrower, but is listed in the required-details file for someone to confirm (Y/N);
-    - anything else counts as a non-borrower owner (about 165).
+  - Before comparing, on both sides: upper-case; remove `MR`, `MRS`, `MS`, `SMT`, `SHRI`, `DR`, `M/S` and punctuation; collapse spaces; treat `PVT LTD` and `PRIVATE LIMITED` as the same, and `MOHD` / `MD` as `MOHAMMED`.
+  - Then compare the names **word by word**. A word of one name matches a word of the other when it is:
+    - the same word, also written differently: sounding the same (`LAXMI` / `LAKSHMI`), with or without `-BEN`, `-BHAI` or `-AMMA` (`LATABEN` / `LATA`), or written as two words (`ANILKUMAR` / `ANIL KUMAR`);
+    - an initial for it, on either side (`CHANDAN K SINGH` / `CHANDAN KAILASH SINGH`);
+    - a close spelling (`PAREKH` / `PARIKH`).
+  - **If each name has a word the other lacks, they are different people**, even when the surname and the father's or husband's name are the same. Relatives share those (`SUNANDA RAMCHANDRA SAWANT` is not `RAMCHANDRA GANPAT SAWANT`). A plain fuzzy score would call them the same and hide a third-party mortgage.
+  - The result for each owner:
+    - **the same person** (every word alike, or at least two alike and the rest initials or extra words) → that borrower (1,457 LMS owners);
+    - **probably the same person** (a close spelling, or too few words alike) → counted as that borrower, but the SI is **held** until someone answers Y or N in the required-details file (145 owners). One answer covers every collateral of the application where that owner appears;
+    - **anything else** → a non-borrower owner (34).
   - A guarantor who owns the property counts here, because guarantors are not in Column 3.
 - **Column 5 - NUMBER_OF_CONSORTIUM_MEMBERS** - `0` by default
 - **Column 6 - SI_TYPE_ID** - take the type of mortgage from the collateral's title report, **item 8 "Nature of Mortgage"** (all 4 demo reports say `Equitable Mortgage` → `17`). The input data doesn't hold this, so it always comes from the title report. The required-details file overrides it.
@@ -290,7 +307,8 @@ In these rows, most values come from the CKYC excel. Join CKYC to the working co
   - Private Trust → `TRS`
   - anything else → flag for review
 - **Column 4 - IS_ASSET_OWNER** - `1` if this borrower is an owner of this collateral, else `0`.
-  - CKYC has **no owner information**. Use the owners decided in SI Column 4 (COLLATERAL owners, checked against title report item 4). Match them to this borrower's `Customer Name` with the same normalised matching.
+  - CKYC has **no owner information**. Use the owners decided in SI Column 4 (COLLATERAL owners, checked against title report item 4). Match them to this borrower's `Customer Name` with the same name comparison.
+  - It is decided **per collateral**: a borrower of an application with several collaterals can own one of them and not another, so the same BOR row can have `1` in one SI block and `0` in the next.
   - Check: the number of borrowers with `1` + SI Column 4 = total owners of the collateral.
 - **Column 5 - BORROWER_UID_TYPE** - blank (must be empty)
 - **Column 6 - BORROWER_UID_VALUE** - blank (must be empty)
@@ -425,4 +443,11 @@ If the legal team treats each flat as a separate mortgage, it should be split in
 - **Owners:** the title report's owners are used, because it is the legal record of ownership, and the collateral is flagged for review.
 - **Anything else:** the input data is used; the title report is only read for values the input data doesn't have. The two are compared only in the right-PDF check.
 - **Differences that matter** (owners, flat/unit number, floor, survey and plot numbers, area beyond 10%, property type, PIN, district) are shown side by side in the required-details file's Check and correct sheet, with the value that will be used.
-- If 2 or more right-PDF checks fail, the PDF may be saved under the wrong name, so hold the SI until someone confirms it; nothing is taken from the PDF meanwhile. A single failure is shown as a warning.
+- If 2 or more right-PDF checks fail, the PDF may be saved under the wrong name, so hold the SI until someone confirms it; nothing is taken from the PDF meanwhile. A single failure is shown as a warning. A PDF whose flat/shop number belongs to another collateral of the same application is held too.
+
+**5. What if one application has several collaterals?**
+
+- Each collateral gets its own SI block, one after the other, each with the application's full sanctioned amount and the same BOR rows (the borrowers belong to the application).
+- The owners are decided per collateral, so IS_ASSET_OWNER, the owner count and IS_TPM can differ between the blocks. For example: a flat owned by husband and wife, a shop owned by the husband alone, and a plot owned by the husband and his mother (who is not a borrower). Here only the plot is a third-party mortgage and is left out; the flat and the shop are filed.
+- Each collateral has its own title report, named with its own Collateral ID. If two of them are swapped, the flat/shop check catches it (see "Legal documents").
+- Borrower values typed in the required-details file (gender, father's/mother's name, …) are typed once per application and used for all its collaterals.

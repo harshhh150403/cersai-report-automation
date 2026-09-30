@@ -7,8 +7,10 @@ equal the number of BOR rows). An SI with any error is left out of the .DAT
 file and listed with its reasons; warnings are listed but do not stop an SI.
 
 SIs are also left out when they are a third-party mortgage (asset-owner rows
-are not supported yet), when their title report may belong to another
-property (held in step 2), or when they are already in an earlier .DAT file.
+are not supported yet), when they wait for an answer (held in step 2: a title
+report that may belong to another property, or an owner name that only
+probably matches a borrower), or when they are already in an earlier .DAT
+file.
 """
 import re
 from dataclasses import dataclass, field
@@ -329,8 +331,9 @@ def check_block(block, masters) -> BlockResult:
 # --------------------------------------------------------------------------
 # The whole batch
 # --------------------------------------------------------------------------
-def check_batch(sheet, masters, held: set, register: dict, filed_status: str) -> list:
-    """Checks every block of the final Excel. Returns a BlockResult per block."""
+def check_batch(sheet, masters, held: dict, register: dict, filed_status: str) -> list:
+    """Checks every block of the final Excel. Returns a BlockResult per block.
+    held: {collateral ID: why it waits for an answer} as recorded by step 2."""
     results = []
     seen_collaterals, seen_tokens = set(), set()
     for block in sheet["blocks"]:
@@ -341,8 +344,8 @@ def check_batch(sheet, masters, held: set, register: dict, filed_status: str) ->
         if entry and entry.get("Status") == filed_status:
             result.left_out_reason = f"already filed in {entry.get('DAT file')} on {entry.get('Date')}"
         elif coll in held:
-            result.left_out_reason = ("held: the title report may belong to another property. Answer PDF_CHECK "
-                                      "in the required-details file (Check and correct) and run step 2 again")
+            result.left_out_reason = (f"held: {held[coll]}. Answer in the required-details file (Check and "
+                                      "correct) and run step 2 again")
         if coll in seen_collaterals:
             result.errors.append(("SI", "", f"collateral {coll} appears twice in the file; only the first is used"))
         if token and token in seen_tokens:

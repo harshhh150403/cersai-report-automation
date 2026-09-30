@@ -38,6 +38,7 @@ from ..context import PDF_OK, WRONG_PDF
 from ..model import (BLANK, BORROWER_KEY_OF_FIELD, CLEAR_WORD, CONFLICT, DEFAULT, INVALID, MISSING, NA,
                      NEEDS_INPUT, SRC_MANUAL, Overrides, is_clear)
 from ..rows import bor_row, imm_row, si_row
+from ..rules.owners import normalise_name
 from ..rules.text import as_text
 
 # (key, hint shown under the header, BOR fields the key fills)
@@ -400,10 +401,27 @@ def _write_collaterals(sheet, blocks, carried, masters, lists) -> int:
     return r - 3
 
 
+def owner_match_groups(blocks) -> OrderedDict:
+    """Owner names that only probably match a borrower, grouped per
+    application, borrower and owner name: the same owner on several
+    collaterals of one application is asked about once.
+    (application, Neo CIF, owner) -> [Collateral IDs]"""
+    groups = OrderedDict()
+    for block in blocks:
+        for link in block.context.owner_links:
+            if link.probable:
+                key = (block.application_number, link.neo_cif, normalise_name(link.owner))
+                groups.setdefault(key, [])
+                if block.collateral_id not in groups[key]:
+                    groups[key].append(block.collateral_id)
+    return groups
+
+
 def _check_rows(blocks, carried, masters) -> list:
     """Rows of the Check and correct sheet: [values..., your value, typed before, choices]."""
     rows = []
     borrowers_done = set()
+    match_groups = owner_match_groups(blocks)
     for block in blocks:
         c = block.context
         coll, app = block.collateral_id, block.application_number
@@ -419,9 +437,13 @@ def _check_rows(blocks, carried, masters) -> list:
         if c.right_pdf["held"] or answer:
             report = c.candidate_report or {}
             failed = "; ".join(f"{n}: {d}" for n, passed, d in c.right_pdf["checks"] if not passed)
+            sibling = c.right_pdf.get("sibling")
+            what = (f"seems to be the report of {sibling}, another collateral of this application ({failed}): "
+                    "if the two files were swapped, rename them and run step 1 again. Otherwise type"
+                    if sibling else f"may belong to another property ({failed}). Type")
             add("SI", "PDF_CHECK",
-                f"The title report {report.get('file', '')} may belong to another property ({failed}). "
-                f"Type {PDF_OK} to use it, or {WRONG_PDF} to ignore it. Until then this SI is held.",
+                f"The title report {report.get('file', '')} {what} {PDF_OK} to use it, or {WRONG_PDF} to "
+                "ignore it. Until then this SI is held.",
                 f"borrowers: {', '.join(b['name'] for b in c.borrowers)}; owners: "
                 f"{'; '.join(c.bundle['lms_owners'])}; address: {c.bundle['property_address']}",
                 f"applicant: {report.get('loan_applicant', '')}; owners: "
@@ -466,9 +488,14 @@ def _check_rows(blocks, carried, masters) -> list:
         by_cif = {b["neo_cif"]: b for b in c.borrowers}
         for link in c.owner_links:
             if link.probable:
+                group = match_groups[(app, link.neo_cif, normalise_name(link.owner))]
+                if group[0] != coll:
+                    continue          # asked on the application's first collateral with this owner
+                also = (f" The answer is used for every collateral of this application with this owner: "
+                        f"{', '.join(group)}." if len(group) > 1 else "")
                 add("BOR", "OWNER_MATCH",
-                    f"Is owner '{link.owner}' the same person as borrower '{link.borrower_name}'? "
-                    "Type Y or N (the tool assumes Y).",
+                    f"Is owner '{link.owner}' the same person as borrower '{link.borrower_name}'? Type Y or N. "
+                    f"Until it is answered the SI is held (the values shown assume Y).{also}",
                     "; ".join(owners.lms_owners), "; ".join(owners.pdf_owners), f"Y (name score {link.score})",
                     link.neo_cif, link.borrower_name, choices="YES_NO")
         for cif, value in answers.items():
@@ -621,6 +648,7 @@ def read_required_details(path, blocks_without_typing, masters):
     overrides, notes = Overrides(), []
     borrowers = collect_borrowers(blocks_without_typing)
     by_collateral = {b.collateral_id: b for b in blocks_without_typing}
+    match_groups = owner_match_groups(blocks_without_typing)
 
     # Borrowers
     sheet = book["Borrowers"]
@@ -695,7 +723,16 @@ def read_required_details(path, blocks_without_typing, masters):
             if field == "OWNER_MATCH" and answer not in ("Y", "N"):
                 notes.append(f"{where}: type Y or N; '{typed}' ignored")
                 continue
-            overrides.per_owner[(coll, cif, field)] = answer if field == "OWNER_MATCH" else typed
+            if field == "IS_ASSET_OWNER":
+                overrides.per_owner[(coll, cif, field)] = typed
+                continue
+            # the same owner on other collaterals of the application gets the same answer
+            targets = [coll]
+            for key, colls in match_groups.items():
+                if key[0] == block.application_number and key[1] == cif and coll in colls:
+                    targets += [c for c in colls if c not in targets]
+            for target in targets:
+                overrides.per_owner[(target, cif, field)] = answer
         elif kind == "BOR":
             if not cif or cif not in {b["neo_cif"] for b in block.context.borrowers}:
                 notes.append(f"{where}: give the Neo CIF ID of a borrower of {coll}; ignored")

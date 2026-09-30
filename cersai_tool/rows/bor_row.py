@@ -94,8 +94,10 @@ def col_03_borrower_type(c, b, serial, row):
 #   owners checked against the title report - see NUMBER_OF_ASSET_OWNERS).
 #   1 when one of the owners is this borrower (names compared ignoring titles,
 #   spelling and initials), otherwise 0.
-# Rules: uncertain name matches count as the same person but are listed in the
-#   Check and correct sheet to confirm.
+# Rules: a name that only probably matches counts as the same person, but the
+#   SI is held until someone confirms it in the Check and correct sheet. With
+#   several collaterals on one application, this is worked out per collateral:
+#   the same borrower can own one property and not another.
 def col_04_is_asset_owner(c, b, serial, row):
     typed = c.pov(b, "IS_ASSET_OWNER")
     if typed is not None:

@@ -67,7 +67,7 @@ def run(paths, batch_name=None, assume_yes=False, log=print, today=None):
 
     data["typed"] = typed.to_json()
     data["final_hash"] = batches.file_hash(final)
-    data["held"] = [b.collateral_id for b in blocks if b.held]
+    data["held"] = {b.collateral_id: "; ".join(b.hold_reasons) for b in blocks if b.held}
     data["notices"] = notices(blocks)
     data["step2_at"] = datetime.now().isoformat(timespec="seconds")
     batches.save_data(folder, data)
@@ -78,7 +78,8 @@ def run(paths, batch_name=None, assume_yes=False, log=print, today=None):
         problems = list(dict.fromkeys(f"{kind} {c.field}" for kind, cells, _ in block.rows for c in cells
                                       if c.status in NEEDS_INPUT and c.status != "default"))
         if problems or block.held or block.tpm:
-            reason = "held (PDF check)" if block.held else "third-party mortgage" if block.tpm else \
+            reason = f"held: {'; '.join(block.hold_reasons)}" if block.held else \
+                "third-party mortgage" if block.tpm else \
                 f"missing/invalid: {', '.join(problems[:4])}{' ...' if len(problems) > 4 else ''}"
             waiting.append(f"{block.collateral_id}: {reason}")
         else:

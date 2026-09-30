@@ -128,7 +128,12 @@ CHG                      ← charge holder (ARGFL)
 **Recommendation: one SI record per (Application number, Collateral ID).** This is what the demo implies: its MIS token is `APPL…` + `COLL…`, and there is exactly one IMM line per SI. The SI row also has no "number of assets" field, which suggests one asset per SI.
 
 - The current extract gives **1,312 SI candidates** from **1,150 active applications**. Of these applications, 1,034 have exactly 1 collateral and 116 have 2–8.
-- Each Collateral ID belongs to exactly one application.
+- **An application can have several collaterals, but each Collateral ID belongs to exactly one application** (checked: no Collateral ID appears under two applications, in any loan status). *(implementation)*
+  - Each collateral of an application gets its own SI block. The borrowers (BOR rows) are the same in each, because they come from the application; each SI carries the full sanctioned amount of the loan (Q7; all 116 multi-collateral applications have one sanctioned amount).
+  - The **owners are worked out per collateral**: across the 116 applications they are the same on every collateral in 46, completely different in 35, overlapping in 28, and missing on some collaterals in 7. So IS_ASSET_OWNER, NUMBER_OF_ASSET_OWNERS and IS_TPM can differ between the SIs of one application.
+  - The SI blocks of one application are written one after the other.
+  - If COLLATERAL ever listed a Collateral ID under two applications, it would be a data error: the collateral is left out of the batch and reported, rather than mixing two applications' rows.
+  - The same property can still secure two applications under **different** Collateral IDs (24 properties share a `Global collateral No`; see TYPE_OF_CHARGE).
 - The title reports follow the same grain: one PDF per collateral, named `<Application number>_<Collateral ID>.pdf` (§15.1).
 - **Confirm (§11 Q5)** whether CERSAI accepts several IMM lines under one SI instead.
 
@@ -253,12 +258,18 @@ Structure, extractable fields and mapping are in **§15**.
     | The lists differ, and another "right PDF" check also fails | — | SI held: possibly the wrong PDF (§15.1) |
     | No usable title report | COLLATERAL's | "Not verified", listed in the review sheet |
     | Neither source has owners | Typed in the required-details file | Manual |
-- **Name normalisation:** upper-case; remove honorifics (`MR`, `MRS`, `MS`, `SMT`, `SHRI`, `DR`, `M/S`, `KUM`); remove punctuation; collapse spaces; treat `PVT LTD` and `PRIVATE LIMITED` as the same. Title reports often write middle names as initials (`<First> G. <Surname>`), so let a single letter match any word starting with that letter.
+- **Name normalisation:** upper-case; remove honorifics (`MR`, `MRS`, `MS`, `SMT`, `SHRI`, `DR`, `M/S`, `KUM`); remove punctuation; collapse spaces; treat `PVT LTD` and `PRIVATE LIMITED` as the same, and `MOHD` / `MD` / `MOHAMMAD` as `MOHAMMED`.
+- **Word-by-word comparison** *(implementation, replaces a plain fuzzy score)*. The words of the two names are paired:
+  - the **same word**, also when written differently: sounding the same (`LAXMI` / `LAKSHMI`, `JAGJEET` / `JAGJIT`), with or without a `-BEN`, `-BHAI` or `-AMMA` ending (`LATABEN` / `LATA`), or as two words (`ANILKUMAR` / `ANIL KUMAR`, `VIRENDRASINGH` / `VIRENDRA SINGH`);
+  - an **initial** for a word, on either side (`CHANDAN K SINGH` / `CHANDAN KAILASH SINGH`); title reports often write middle names as initials;
+  - a **close spelling** (`PAREKH` / `PARIKH`, `NUTALA` / `NUTALAPATI`).
+
+  Two names are **different people when each has a word the other lacks** — a different given name — or when only initials correspond. Relatives share the surname and often the father's or husband's name (`SUNANDA RAMCHANDRA SAWANT` / `RAMCHANDRA GANPAT SAWANT`, a wife `POOJABEN ASHWINBHAI CHAUHAN` / her husband `ASHWINBHAI JAGDISHBHAI CHAUHAN`). A plain fuzzy score rates such pairs as the same person, which would hide a third-party mortgage.
 - **Match each owner to the application's borrowers:**
-  - an exact normalised match is **matched**;
-  - a high fuzzy score (for example rapidfuzz token-set ratio of about 90 or more) is **probable**: it counts as the same person, but is listed in the required-details file for a Y/N confirmation;
-  - anything else is a **non-borrower owner**.
-- **Current extract (active loans, LMS owner names):** 1,636 owner rows. A raw exact text match finds only 798. After normalisation, 1,188 match exactly, 284 more match on tokens (for example `MR. PREM MATA SEVAK MISHRA` vs `PREM MATASEVAK MISHRA`), and 165 don't match. By collateral: 1,120 have all owners among the borrowers, 35 have some non-borrower owners, 120 have no owner matched, and 37 have no owner data.
+  - **same** (all words alike, or at least two alike and the rest initials or extra words) → the borrower;
+  - **probable** (a close spelling, or too few words alike) → counts as the borrower, but **the SI is held** until someone answers Y or N in the required-details file *(implementation)*. One answer covers every collateral of the application where that owner appears;
+  - anything else → a **non-borrower owner** (third-party mortgage).
+- **Current extract (active loans, LMS owner names):** 1,636 owner rows. A raw exact text match finds only 798. With the rules above: 1,457 match a borrower, 145 probably match (135 collaterals wait for a Y/N answer), and 34 match no borrower (34 collaterals are third-party mortgages); 37 collaterals have no owner data. The earlier plain fuzzy rule linked relatives to each other, for example the wife above to her husband.
 - **Outputs:**
   - `BOR.IS_ASSET_OWNER` = 1 if that borrower matched an owner of this collateral, else 0.
   - `SI.NUMBER_OF_ASSET_OWNERS` = the number of **non-borrower** owners. It is 0 when every owner is a borrower, as the spec says.
@@ -859,12 +870,11 @@ Added 2026-09-30 from four demo reports. Their file names were made up only to s
 **Linking steps:**
 
 1. List `Input data/Legal/*.pdf` and split each name with the pattern `^(APPL\d{8})_(COLL\d{8})\.pdf$` (extension in any case). A name that doesn't fit → exception "bad file name".
-2. Look up the Collateral ID among the **active** collaterals (`Loan Status = A`). It must match exactly. No match → exception "no active collateral for this PDF" (for example a typo in the name, or a loan that isn't active).
-3. Check that COLLATERAL lists that collateral under the application in the file name. If not → exception "misfiled PDF". Don't guess which half of the name is wrong.
-4. Two PDFs for the same collateral → exception.
-5. Active collaterals with no PDF are listed as "no title report". Their values come from the LMS as normal; the type of mortgage defaults to 17, and any remaining gaps go to the required-details file.
+2. Look up the Collateral ID in COLLATERAL (any loan status). It must match exactly, and because a collateral belongs to one application only, COLLATERAL must list it under the application in the file name. Listed under another application → exception "misfiled PDF: rename". Not in COLLATERAL at all → exception "no such collateral" (for example a typo in the name). Don't guess which half of the name is wrong.
+3. Two PDFs for the same collateral → exception.
+4. Active collaterals with no PDF are listed as "no title report". Their values come from the LMS as normal; the type of mortgage defaults to 17, and any remaining gaps go to the required-details file.
 
-The Legal folder keeps PDFs from earlier days, so a PDF is reported in steps 1–3 only when its name mentions an application of the current batch; others are ignored silently. *(implementation)*
+The Legal folder keeps PDFs from earlier days, so only PDFs that concern the current batch are reported. A report of a collateral that is not in the batch (filed earlier, or not active) is ignored silently, even when another collateral of the same application is in the batch. *(implementation)*
 
 **"Right PDF" check.** Before any value is taken from a PDF, confirm that it describes this collateral. A PDF saved under the wrong name would otherwise fill gaps with another property's details. The check compares three things that both sources hold:
 
@@ -873,6 +883,10 @@ The Legal folder keeps PDFs from earlier days, so a PDF is reported in steps 1�
 | Borrower | "Loan applicant" in the header box (ignore a bracketed business name) | CKYC primary borrower's name (fuzzy) |
 | Owners | Item 4 names | COLLATERAL `Owner Name` rows for the collateral |
 | Unit | Unit number in item 1 (e.g. `1102`, `C-3002`) | Appears in COLLATERAL `Full Address` |
+
+The unit check counts as failed only when the LMS address names a unit of its own; an address without one cannot be compared. *(implementation)*
+
+**Reports swapped between the collaterals of one application.** They share the loan applicant and often the owners, so for two of them only the unit number tells the reports apart. When a report's unit is not in this collateral's LMS address but is the unit of another collateral of the same application, the SI is held whatever the other checks say, with a message naming that collateral (rename the two files and run step 1 again, or answer `WRONG PDF`). *(implementation)*
 
 If two or more checks fail, hold the SI as "possible wrong PDF" until someone answers `PDF OK` or `WRONG PDF` in the required-details file. **While the SI is held, no value is taken from that PDF** *(implementation)*. A single failure is shown as a warning. The owner comparison doubles as the owner verification (§6.3). Apart from the owners, these checks only verify the file: the values used still follow the LMS-first rule.
 

@@ -22,7 +22,12 @@ class Block:
 
     @property
     def held(self) -> bool:
-        return self.context.right_pdf["held"]
+        """Waiting for an answer in the required-details file (PDF_CHECK or OWNER_MATCH)."""
+        return bool(self.context.hold_reasons)
+
+    @property
+    def hold_reasons(self) -> list:
+        return self.context.hold_reasons
 
     def cells(self, row_type):
         return [cells for kind, cells, _ in self.rows if kind == row_type]
@@ -38,9 +43,14 @@ class Block:
 
 def build_blocks(data: dict, masters, overrides, run_date) -> list:
     reports = data.get("title_reports", {})
+    by_application = {}
+    for bundle in data["bundles"]:
+        by_application.setdefault(bundle["application_number"], []).append(bundle)
     blocks = []
     for serial, bundle in enumerate(data["bundles"], start=1):
-        c = CollateralContext(bundle, reports.get(bundle["collateral_id"]), masters, overrides, serial, run_date)
+        siblings = [b for b in by_application[bundle["application_number"]] if b is not bundle]
+        c = CollateralContext(bundle, reports.get(bundle["collateral_id"]), masters, overrides, serial, run_date,
+                              siblings)
         block = Block(c)
         block.rows.append(("SI", si_row.build(c), None))
         block.rows.append(("IMM", imm_row.build(c), None))

@@ -30,39 +30,51 @@ ITEM_LABELS = [
 ]
 
 
-def index_folder(folder: Path, active_ids: dict):
+def index_folder(folder: Path, batch_ids: dict, known_ids: dict = None):
     """Finds the title reports for this batch.
 
-    active_ids: {collateral_id: application_number} of the batch.
+    batch_ids: {collateral_id: application_number} of the batch.
+    known_ids: the same for every collateral in the COLLATERAL extract, any
+    loan status (defaults to batch_ids).
     Returns (found, problems): found = {collateral_id: path}; problems = list of
-    (file name, message) for names that break the convention or point to the
-    wrong application. PDFs for collaterals that are not in this batch (older
-    days) are ignored silently."""
+    (file name, message).
+
+    The Legal folder keeps the reports of earlier days, so a report is only
+    reported when it concerns this batch: its name does not follow the
+    convention, pairs a collateral with the wrong application (a collateral
+    belongs to one application only), names a collateral that COLLATERAL does
+    not have, or duplicates another report. Reports of collaterals that are not
+    in this batch (filed earlier, or not active) are ignored silently, even
+    when another collateral of the same application is in the batch."""
+    known_ids = known_ids if known_ids is not None else batch_ids
     found, problems = {}, []
     if not folder.exists():
         return found, [("", f"Legal folder not found: {folder}")]
-    batch_apps = set(active_ids.values())
+    batch_apps = set(batch_ids.values())
+    naming = "file name does not follow <APPL + 8 digits>_<COLL + 8 digits>.pdf"
     for path in sorted(folder.glob("*")):
         if path.suffix.lower() != ".pdf":
             continue
         m = NAME_RE.match(path.name)
         if not m:
             head = re.match(r"(APPL\d+)", path.name, re.I)
-            if head and head.group(1).upper() in batch_apps:
-                problems.append((path.name, "file name does not follow <APPL + 8 digits>_<COLL + 8 digits>.pdf"))
-            elif not head:
-                problems.append((path.name, "file name does not follow <APPL + 8 digits>_<COLL + 8 digits>.pdf"))
+            if not head or head.group(1).upper() in batch_apps:
+                problems.append((path.name, naming))
             continue
         app, coll = m.group(1).upper(), m.group(2).upper()
-        if coll in active_ids:
-            if active_ids[coll] != app:
-                problems.append((path.name, f"collateral {coll} belongs to {active_ids[coll]}, not {app}: misfiled"))
-            elif coll in found:
+        owner_app = known_ids.get(coll)
+        if owner_app and owner_app != app:
+            if coll in batch_ids or app in batch_apps:
+                problems.append((path.name, f"the name pairs {coll} with {app}, but {coll} belongs to {owner_app} "
+                                            "(a collateral belongs to one application only): rename the file"))
+            continue
+        if coll in batch_ids:
+            if coll in found:
                 problems.append((path.name, f"a second PDF for {coll}; only {found[coll].name} is used"))
             else:
                 found[coll] = path
-        elif app in batch_apps:
-            problems.append((path.name, f"no active collateral {coll} for {app} in this batch"))
+        elif owner_app is None and app in batch_apps:
+            problems.append((path.name, f"COLLATERAL has no collateral {coll} (for {app}): check the file name"))
     return found, problems
 
 

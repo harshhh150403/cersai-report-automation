@@ -6,6 +6,11 @@ The data sheet is "Export Worksheet". Only active loans (COLLATERAL
 a plain dictionary with everything the rows need about that collateral, its
 borrowers and its owners. Bundles are saved with the batch, so later steps
 never have to read the input files again.
+
+An application can have several collaterals, but a collateral belongs to one
+application only. Borrowers are per application (the same on each of its
+collaterals); owners are per collateral (they can differ between the
+collaterals of one application).
 """
 from collections import OrderedDict
 from pathlib import Path
@@ -65,9 +70,15 @@ def _distinct(values):
 
 
 def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
-    """Returns (bundles, notes). notes lists problems found while reading."""
+    """Returns (bundles, notes, known). notes lists problems found while
+    reading; known maps every Collateral ID in the extract (any loan status)
+    to its application."""
     notes = []
     active = coll[coll["Loan Status"].str.upper() == "A"]
+    # a collateral belongs to one application only; the LMS should never list
+    # it under two, but if it does, its rows cannot be trusted
+    apps_of = {c: _distinct(rows["Application number"]) for c, rows in coll.groupby("Collateral ID")}
+    known = {c: apps[0] for c, apps in apps_of.items() if c and apps}
     dropped = coll[coll["Loan Status"].str.upper() != "A"]["Application number"].nunique()
     if dropped:
         notes.append(f"{dropped} application(s) have cancelled or closed loan accounts (status X/C); "
@@ -81,6 +92,11 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
     bundles = []
     for coll_id, rows in active.groupby("Collateral ID", sort=False):
         if not coll_id:
+            continue
+        if len(apps_of.get(coll_id, [])) > 1:
+            notes.append(f"{coll_id} is listed under more than one application in COLLATERAL "
+                         f"({', '.join(apps_of[coll_id])}), but a collateral belongs to one application only: "
+                         "left out until the LMS data is corrected")
             continue
         app = _first(rows["Application number"])
         first = rows.iloc[0]
@@ -116,7 +132,9 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
             "shared_with_applications": shared,
             "problems": problems,
         })
-    return bundles, notes
+    # the collaterals of one application next to each other
+    bundles.sort(key=lambda b: (b["application_number"], b["collateral_id"]))
+    return bundles, notes, known
 
 
 def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame) -> list:
@@ -166,12 +184,13 @@ def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame) -> list:
 
 
 def load_bundles(paths):
-    """Reads both LMS files and returns (bundles, notes, input_info)."""
+    """Reads both LMS files and returns (bundles, notes, input_info, known)
+    (known: every Collateral ID in COLLATERAL -> its application)."""
     ckyc_file = find_single_xlsx(paths.ckyc_folder)
     coll_file = find_single_xlsx(paths.collateral_folder)
     ckyc = read_export(ckyc_file, CKYC_COLUMNS)
     coll = read_export(coll_file, COLLATERAL_COLUMNS)
-    bundles, notes = build_bundles(ckyc, coll)
+    bundles, notes, known = build_bundles(ckyc, coll)
     info = {"ckyc_file": str(ckyc_file), "ckyc_rows": len(ckyc),
             "collateral_file": str(coll_file), "collateral_rows": len(coll)}
-    return bundles, notes, info
+    return bundles, notes, info, known
