@@ -1,0 +1,1 @@
+Not a PDF: the tool ignores this file.
