@@ -73,7 +73,7 @@ INCLUDE_GUARANTORS = False       # guarantors are not borrowers (Q10)
 # Matching thresholds (0-100 name similarity)
 # --------------------------------------------------------------------------
 SAME_PERSON_SCORE = 90           # at or above: the same person
-PROBABLE_PERSON_SCORE = 75       # between this and the above: ask someone to confirm
+PROBABLE_PERSON_SCORE = 75       # between this and the above: similar names, decided and listed for review
 RIGHT_PDF_HOLD_FAILURES = 2      # this many failed "right PDF" checks holds the SI
 AREA_TOLERANCE = 0.10            # LMS vs title-report area: flag if more than 10% apart
 

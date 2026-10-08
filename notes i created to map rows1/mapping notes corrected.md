@@ -40,6 +40,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - The owners are worked out per collateral. They can be the same on every collateral, different, or overlapping, so IS_ASSET_OWNER, the owner count and IS_TPM can differ between the SIs of one application.
   - The SI blocks of one application are written one after the other.
   - If COLLATERAL ever lists a Collateral ID under two applications, that is a data error: the collateral is left out and reported until the LMS is corrected.
+  - If two collaterals of one application have the same address (with different Global collateral Nos), both SIs get a warning: check that the same property is not recorded twice.
   - The same property can secure two applications only under two different Collateral IDs (same `Global collateral No`; see SI Column 13).
 - **Date format everywhere is `yyyy-mm-dd`**, written as **text**. If Excel stores a date as a date, the concatenated output shows a serial number such as `38169`.
 - **Output:**
@@ -50,7 +51,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
 - **Column 1 of every row is its row type:** `FH`, `SI`, `IMM`, `BOR` or `CHG`.
 - **Which source wins:** a value typed in the required-details file → input data (CKYC, COLLATERAL) → title report → default.
   - Read a title report only for values the input data doesn't have or that can't be used. The one value that always comes from it is the **type of mortgage**, which the input data doesn't hold.
-  - Exception: **property owners** are checked against the title report for every collateral that has one, because ownership is what the title report certifies (see SI Column 4).
+  - **Property owners** follow the same rule: COLLATERAL first, with the title report checking them for every collateral that has one. The title report supplies the owners only when COLLATERAL has none, or adds one when the COLLATERAL shares show an owner is missing (see SI Column 4).
   - "Available" means present **and usable**:
     - not blank;
     - valid against the masters (e.g. a PIN that exists in the PIN master);
@@ -60,7 +61,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
 - **The required-details file is keyed**, so typed values are matched back automatically:
   - sheet **Collaterals**: one row per collateral that needs a value, keyed by **Collateral ID**;
   - sheet **Borrowers**: one row per borrower that needs a value, keyed by **Application number + Neo CIF ID** (a value typed there is used on every SI of that application);
-  - sheet **Check and correct**: differences between the input data and the title report side by side, title reports that may belong to another property, owner names to confirm, and empty rows to correct any other value.
+  - sheet **Check and correct**: differences between the input data and the title report side by side, title reports that may belong to another property, the owner decisions the tool made on its own, and empty rows to correct any other value.
 
   Cells to fill are yellow; the values the tool found are shown in grey and can be typed over. City and district can be typed as a name or a CERSAI code. Typing `BLANK` leaves an optional value empty.
 - **Text cleaning (applies to every text column):**
@@ -93,11 +94,11 @@ The counts quoted below come from the current LMS extract, active loans only. Th
 
      If 2 or more checks fail, hold the SI until someone answers `PDF OK` or `WRONG PDF` in the required-details file. While the SI is held, **no value is taken from that PDF**.
 
-     **Reports swapped between two collaterals of one application:** these share the loan applicant and often the owners, so only the flat/shop number gives it away. If the unit in the PDF is not this collateral's but is the unit of another collateral of the same application, hold the SI whatever the other checks say, naming that collateral (rename the two files, or answer `WRONG PDF`). The owner comparison is also the owner check described in SI Column 4. Apart from the owners, these checks only verify the file; they never replace an input-data value.
+     **Reports swapped between two collaterals of one application:** these share the loan applicant and often the owners, so only the flat/shop number gives it away. If the unit in the PDF is not this collateral's but is the unit of another collateral of the same application (including one filed in an earlier batch), hold the SI whatever the other checks say, naming that collateral (rename the two files, or answer `WRONG PDF`). The owner comparison is also the owner check described in SI Column 4. Apart from the owners, these checks only verify the file; they never replace an input-data value.
 - **What the report looks like:** a "TITLE REPORT" from the advocate with a header (Status, dates), a box with "Loan applicant" and "Property Owner", and a numbered table. The items used here:
   - **Item 1 — Full Description of the property:** flat/shop number, floor, area and unit, society/project, building, survey/Hissa/plot numbers, village, district (a PIN only sometimes). Used for any of these the input data lacks.
   - **Item 2 — Nature of immovable property:** Residential / Commercial. Used only for `PLOT` properties.
-  - **Item 4 — Name of the owner:** the owners. Always read: it verifies the COLLATERAL owners, and replaces them when COLLATERAL has none or the two disagree.
+  - **Item 4 — Name of the owner:** the owners. Always read: it checks the COLLATERAL owners, supplies them when COLLATERAL has none, and adds an owner when the COLLATERAL shares show one is missing. When it simply names other owners, the COLLATERAL owners are kept and both lists are shown for review.
   - **Item 8 — Nature of Mortgage:** e.g. Equitable Mortgage ("Mortgage by deposit of title deeds" is also an equitable mortgage). Always used.
 
   Find items by their **label**, not their number: one law firm's reports have no item 6.
@@ -129,27 +130,33 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - Counting in the COLLATERAL excel works: every collateral row lists all customers of its application, and the set is identical to CKYC.
   - This number **must equal the number of BOR rows written** for this collateral. Derive both from the same borrower list; never type it by hand.
 - **Column 4 - NUMBER_OF_ASSET_OWNERS** - number of the collateral's owners who are **not** borrowers; `0` when every owner is a borrower.
-  - **Owners are checked against the title report.** Read both lists:
-    - COLLATERAL `Owner Name` (the distinct names on this collateral's active rows);
-    - the title report's **item 4 "Name of the owner"** (e.g. `Mr. A & Mrs. B`, `A, B and C`). Split it on `,`, `&` and `and`, but keep company names such as `X AND COMPANY` whole; then remove `Mr.`/`Mrs.`/`Dr.`/`Smt.`. If the report's header box or item 12 names different owners from item 4, flag the report.
+  - **Owners come from COLLATERAL first** (decided 2026-09-30): the distinct `Owner Name` values on this collateral's active rows.
+    - **Double-check the count** with `Percentage Share` (the shares must add up to 100%) and `Ownership Status` (`Single` = one owner, `Joint` = two or more). If they don't add up, list the collateral in Check and correct. In the current extract they always add up.
+    - **One cell can hold two people** (`Kalaiselvi and Radhakrishnan Sankaranarayanan`, 100%, Single: 3 collaterals). Split it into two owners only when each part is a different borrower. Company names contain "and" too (`Jamson Machine and tools`, `OSNAR PAINTS AND CONTRACTS`), so a name that is not split and has no business word is only listed for review.
+  - **The title report checks them.** Read its **item 4 "Name of the owner"** (e.g. `Mr. A & Mrs. B`, `A, B and C`). Split it on `,`, `&` and `and`, but keep company names such as `X AND COMPANY` whole, and keep `S/O ...` with the name before it; then remove `Mr.`/`Mrs.`/`Dr.`/`Smt.`. If the report's header box or item 12 names different owners from item 4, flag the report.
   - Compare the two lists, comparing names as described below:
     - **same owners** → use them (verified);
-    - **COLLATERAL has no owners** (37 collaterals) → use the title report's owners;
-    - **the lists differ** (different names, or a different number of owners) → use the title report's owners, because the title report is the legal record of ownership, and flag the collateral for review. If another right-PDF check also fails, hold the SI instead: it may be the wrong PDF;
-    - **no usable title report** → use COLLATERAL's owners, marked "not verified";
+    - **the lists differ** → **use the COLLATERAL owners**, and show both lists in Check and correct, where the right owners can be typed. Title-report owner names are harder to read reliably than the COLLATERAL column;
+    - **the COLLATERAL shares show an owner is missing** (they add up to less than 100%, or `Joint` with one owner) **and the title report names every COLLATERAL owner plus others** → add those others (the title report fills the gap), shown in Check and correct;
+    - **COLLATERAL has no owners** (37 collaterals) → use the title report's owners, shown in Check and correct;
+    - **no usable title report** → use the COLLATERAL owners, marked "not verified";
     - **neither source has owners** → typed in the required-details file.
   - Work owners out **per collateral**: the collaterals of one application can have the same owners, different owners, or some owners in common.
   - Match each owner to the borrowers kept in Column 3. An exact text match is not enough: in the LMS data only 798 of 1,636 owner names match a `Customer Name` exactly. Owner names carry `Mr.`/`Mrs.`/`Smt.`, leading spaces, different case and spelling variants (`MR. PREM MATA SEVAK MISHRA` vs `PREM MATASEVAK MISHRA`).
-  - Before comparing, on both sides: upper-case; remove `MR`, `MRS`, `MS`, `SMT`, `SHRI`, `DR`, `M/S` and punctuation; collapse spaces; treat `PVT LTD` and `PRIVATE LIMITED` as the same, and `MOHD` / `MD` as `MOHAMMED`.
+  - Before comparing, on both sides: upper-case; remove `MR`, `MRS`, `MS`, `SMT`, `SHRI`, `DR`, `M/S` and punctuation; collapse spaces; treat `PVT LTD` and `PRIVATE LIMITED` as the same, and `MOHD` / `MD` as `MOHAMMED`. Drop a relative's name after `S/O`, `D/O`, `W/O` (CKYC writes `SO`, `DO`, `WO`: `KAMALA DO HIMMATMAL` is compared as `KAMALA`, so she is not taken for her father).
   - Then compare the names **word by word**. A word of one name matches a word of the other when it is:
     - the same word, also written differently: sounding the same (`LAXMI` / `LAKSHMI`), with or without `-BEN`, `-BHAI` or `-AMMA` (`LATABEN` / `LATA`), or written as two words (`ANILKUMAR` / `ANIL KUMAR`);
     - an initial for it, on either side (`CHANDAN K SINGH` / `CHANDAN KAILASH SINGH`);
     - a close spelling (`PAREKH` / `PARIKH`).
   - **If each name has a word the other lacks, they are different people**, even when the surname and the father's or husband's name are the same. Relatives share those (`SUNANDA RAMCHANDRA SAWANT` is not `RAMCHANDRA GANPAT SAWANT`). A plain fuzzy score would call them the same and hide a third-party mortgage.
-  - The result for each owner:
-    - **the same person** (every word alike, or at least two alike and the rest initials or extra words) → that borrower (1,457 LMS owners);
-    - **probably the same person** (a close spelling, or too few words alike) → counted as that borrower, but the SI is **held** until someone answers Y or N in the required-details file (145 owners). One answer covers every collateral of the application where that owner appears;
+  - **The given names must correspond.** When one name only has extra words, the two given names must pair up. A wife's name usually contains her husband's given name and surname: `DEEPA RAVIRAJ HIREMATH` is not `RAVIRAJ HIREMATH` (her given name is Deepa); a missing middle name is fine (`ROHAN JOSHI` = `ROHAN MAHESH JOSHI`). Names can be written surname first (`SHAH RAGINI DHIRAJ`); a leading initial (`M GURU RAGHAVENDRA`) or `MOHAMMED` is not the given name.
+  - **One borrower per owner, per property.** Owners listed separately are different people, so each borrower is linked to one owner of a collateral at most, best match first. When husband and wife both own a property and only the husband is a borrower, the wife cannot be linked to him: she is a non-borrower owner (third-party mortgage).
+  - The result for each owner (nothing waits for an answer; the tool decides):
+    - **the same person** (every word alike, or at least two alike and the rest initials or extra words, with the given names corresponding) → that borrower (1,450 LMS owners);
+    - **similar names** (a close spelling, too few words alike, or the word order unclear) → taken to be that borrower (149 owners);
+    - **given names differ** (a relative: the owner `GOPALAKRISHNAN` and the borrower `KAVITHA GOPALAKRISHNAN`) → a different person (3 owners);
     - **anything else** → a non-borrower owner (34).
+  - The similar-name and relative decisions (142 collaterals) are listed in Check and correct. A `Y` or `N` typed there changes the decision, and one answer covers every collateral of the application where that owner appears.
   - A guarantor who owns the property counts here, because guarantors are not in Column 3.
 - **Column 5 - NUMBER_OF_CONSORTIUM_MEMBERS** - `0` by default
 - **Column 6 - SI_TYPE_ID** - take the type of mortgage from the collateral's title report, **item 8 "Nature of Mortgage"** (all 4 demo reports say `Equitable Mortgage` → `17`). The input data doesn't hold this, so it always comes from the title report. The required-details file overrides it.
@@ -388,7 +395,7 @@ This row is **fixed**: it is the same for every SI, and nothing is mapped into i
 | Village / area | Item 1 | 4 of 4 | Locality not found in the LMS address | IMM Column 18 |
 | Area and its unit | Item 1 | 4 of 4 | LMS `Carpert Area` is blank (10 collaterals) | IMM Columns 10–11 |
 | Nature (Residential / Commercial) | Item 2 | 4 of 4 | `Property Type` is `PLOT` (35 collaterals) | IMM Column 3 |
-| Property owner name(s) | Item 4 (also the header box) | 4 of 4 | **Always**: verifies the COLLATERAL owners, and replaces them when COLLATERAL has none (37 collaterals) or the two disagree | SI Columns 4 and 14, BOR Column 4 |
+| Property owner name(s) | Item 4 (also the header box) | 4 of 4 | **Always**: checks the COLLATERAL owners; used when COLLATERAL has none (37 collaterals); adds an owner only when the COLLATERAL shares show one is missing | SI Columns 4 and 14, BOR Column 4 |
 | District name | Item 1 | 4 of 4 | The LMS PIN maps to several districts (89 collaterals) | IMM Column 20 |
 | PIN | Item 1 | 1 of 4 | The LMS PIN is blank or not in the master (8 collaterals) | IMM Column 22 |
 
@@ -398,7 +405,7 @@ This row is **fixed**: it is the same for every SI, and nothing is mapped into i
   - the type of charge for the 24 properties that secure two loans;
   - a city code when the automatic match fails;
   - a plot's use for `PLOT` properties;
-  - answers to the checks: `PDF OK` / `WRONG PDF` for a held title report, and Y/N for an owner name that only probably matches a borrower.
+  - answers to the checks: `PDF OK` / `WRONG PDF` for a held title report, and (optional) Y/N to change an owner decision the tool made on similar names.
 - **Per borrower** (key: Application number + Neo CIF ID). These are never in a title report:
 
 | Value | Goes to |
@@ -440,7 +447,7 @@ If the legal team treats each flat as a separate mortgage, it should be split in
 
 **4. What if the title report and the input data disagree (e.g. owners or flat number)?**
 
-- **Owners:** the title report's owners are used, because it is the legal record of ownership, and the collateral is flagged for review.
+- **Owners:** the COLLATERAL owners are used and both lists are shown in Check and correct. The title report adds owners only when the COLLATERAL shares show one is missing and the report names every COLLATERAL owner plus others.
 - **Anything else:** the input data is used; the title report is only read for values the input data doesn't have. The two are compared only in the right-PDF check.
 - **Differences that matter** (owners, flat/unit number, floor, survey and plot numbers, area beyond 10%, property type, PIN, district) are shown side by side in the required-details file's Check and correct sheet, with the value that will be used.
 - If 2 or more right-PDF checks fail, the PDF may be saved under the wrong name, so hold the SI until someone confirms it; nothing is taken from the PDF meanwhile. A single failure is shown as a warning. A PDF whose flat/shop number belongs to another collateral of the same application is held too.
@@ -448,6 +455,7 @@ If the legal team treats each flat as a separate mortgage, it should be split in
 **5. What if one application has several collaterals?**
 
 - Each collateral gets its own SI block, one after the other, each with the application's full sanctioned amount and the same BOR rows (the borrowers belong to the application).
-- The owners are decided per collateral, so IS_ASSET_OWNER, the owner count and IS_TPM can differ between the blocks. For example: a flat owned by husband and wife, a shop owned by the husband alone, and a plot owned by the husband and his mother (who is not a borrower). Here only the plot is a third-party mortgage and is left out; the flat and the shop are filed.
+- The owners are decided per collateral, so IS_ASSET_OWNER, the owner count and IS_TPM can differ between the blocks. For example: a flat owned by husband and wife, a shop owned by the husband alone, and a plot owned by the husband and his mother (who is not a borrower). Here only the plot is a third-party mortgage and is left out; the flat and the shop are filed. In the current extract, IS_ASSET_OWNER differs between the SIs of 54 of the 116 applications with several collaterals.
+- Family members' names overlap (a wife's name usually contains her husband's), so each owner is matched to the borrower whose given name corresponds, and each borrower to one owner per property (see SI Column 4).
 - Each collateral has its own title report, named with its own Collateral ID. If two of them are swapped, the flat/shop check catches it (see "Legal documents").
 - Borrower values typed in the required-details file (gender, father's/mother's name, …) are typed once per application and used for all its collaterals.

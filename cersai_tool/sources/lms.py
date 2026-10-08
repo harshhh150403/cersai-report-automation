@@ -18,7 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from .. import settings
-from ..rules.owners import unique_names
+from ..rules.owners import strip_titles, unique_names
 from ..rules.text import as_text
 
 CKYC_COLUMNS = ["First Disbursal Date", "Application Number", "Loan Account No", "Customer Type",
@@ -111,6 +111,7 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
         if app_ckyc is None:
             problems.append("no CKYC rows for this application")
 
+        owners, shares = _owners_with_shares(rows)
         global_no = as_text(first["Global collateral No"])
         shared = [a for a in apps_by_property.get(global_no, []) if a != app] if global_no else []
 
@@ -127,14 +128,58 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
             "sanctioned_amounts": _distinct(rows["Sanctioned Loan Amount"]),
             "collateral_disbursal_date": _first(rows["Disbursal Date"]),
             "first_disbursal_date": _first(app_ckyc["First Disbursal Date"]) if app_ckyc is not None else "",
-            "lms_owners": unique_names(rows["Owner Name"]),
+            "lms_owners": owners,
+            "lms_owner_shares": shares,
+            "ownership_status": _first(rows["Ownership Status"]),
             "borrowers": borrowers,
             "shared_with_applications": shared,
             "problems": problems,
         })
     # the collaterals of one application next to each other
     bundles.sort(key=lambda b: (b["application_number"], b["collateral_id"]))
+    _link_siblings(bundles)
     return bundles, notes, known
+
+
+def _link_siblings(bundles: list):
+    """Gives each bundle the other active collaterals of its application (also
+    those filed in an earlier batch): the title-report check uses them to spot
+    two reports saved under each other's names. Two collaterals of one
+    application with the same address are reported: they may be the same
+    property recorded twice."""
+    by_application = {}
+    for bundle in bundles:
+        by_application.setdefault(bundle["application_number"], []).append(bundle)
+    for group in by_application.values():
+        for bundle in group:
+            bundle["siblings"] = [{"collateral_id": other["collateral_id"],
+                                   "property_address": other["property_address"],
+                                   "global_collateral_no": other["global_collateral_no"]}
+                                  for other in group if other is not bundle]
+            key = _address_key(bundle["property_address"])
+            same = [other["collateral_id"] for other in group
+                    if other is not bundle and key and _address_key(other["property_address"]) == key]
+            if same:
+                bundle["problems"].append(
+                    f"the property address is the same as that of {', '.join(same)} of this application (with a "
+                    "different Collateral ID and Global collateral No): check that it is not the same property "
+                    "recorded twice before filing both")
+
+
+def _address_key(text: str) -> str:
+    return " ".join("".join(ch if ch.isalnum() else " " for ch in as_text(text).upper()).split())
+
+
+def _owners_with_shares(rows: pd.DataFrame):
+    """The collateral's distinct owners (titles removed, each person once) and
+    each one's COLLATERAL "Percentage Share"."""
+    owners = unique_names(rows["Owner Name"])
+    shares = []
+    for owner in owners:
+        share = next((as_text(pct) for name, pct in zip(rows["Owner Name"], rows["Percentage Share"])
+                      if strip_titles(as_text(name)) == owner), "")
+        shares.append(share)
+    return owners, shares
 
 
 def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame) -> list:

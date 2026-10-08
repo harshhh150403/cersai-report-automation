@@ -12,8 +12,9 @@ Sheets
   Collaterals        one row per collateral with a value to fill.
   Check and correct  what someone should look at: differences between the LMS
                      and the title report (both values side by side), title
-                     reports that may belong to another property, owner names
-                     to confirm, and empty rows to correct any other value.
+                     reports that may belong to another property, the owner
+                     decisions the tool made on its own, and empty rows to
+                     correct any other value.
   Lists              (hidden) the choices offered by the drop-downs.
 
 Cells to fill are yellow and empty. Grey cells show the value the tool found:
@@ -402,15 +403,15 @@ def _write_collaterals(sheet, blocks, carried, masters, lists) -> int:
 
 
 def owner_match_groups(blocks) -> OrderedDict:
-    """Owner names that only probably match a borrower, grouped per
-    application, borrower and owner name: the same owner on several
-    collaterals of one application is asked about once.
-    (application, Neo CIF, owner) -> [Collateral IDs]"""
+    """Owner names the tool matched (or did not match) to a borrower on similar
+    names, grouped per application, borrower and owner name: the same owner on
+    several collaterals of one application is listed once, and a Y/N typed for
+    it is used for all of them. (application, Neo CIF, owner) -> [Collateral IDs]"""
     groups = OrderedDict()
     for block in blocks:
         for link in block.context.owner_links:
-            if link.probable:
-                key = (block.application_number, link.neo_cif, normalise_name(link.owner))
+            if link.uncertain:
+                key = (block.application_number, link.near_cif, normalise_name(link.owner))
                 groups.setdefault(key, [])
                 if block.collateral_id not in groups[key]:
                     groups[key].append(block.collateral_id)
@@ -460,47 +461,65 @@ def _check_rows(blocks, carried, masters) -> list:
                 if cell.status == CONFLICT and cell.field != "NUMBER_OF_ASSET_OWNERS":
                     add(kind, cell.field, cell.note, cell.lms_value, cell.pdf_value, cell.value)
 
-        # owners
+        # owners: COLLATERAL first, the title report's names shown next to them
         owners = c.owners
+        shares = dict(zip(c.bundle["lms_owners"], c.bundle.get("lms_owner_shares") or []))
+        lms_text = "; ".join(f"{o} ({shares[o]}%)" if shares.get(o) else o for o in owners.lms_owners)
         messages = []
-        if owners.status == "conflict":
-            messages.append("The LMS and the title report name different owners; the title report's owners are "
-                            "used.")
-        elif owners.status == "held":
-            messages.append("The LMS and the title report name different owners, and the title report may be "
-                            "for another property (see PDF_CHECK); the LMS owners are used for now.")
-        elif owners.status == "not_verified":
-            messages.append("The owners could not be checked against a title report (none usable).")
+        if owners.status == "differs":
+            messages.append("COLLATERAL and the title report name different owners: the COLLATERAL owners are used. "
+                            "If the title report is right, type the owners here.")
         elif owners.status == "from_title_report":
-            messages.append("COLLATERAL has no owners; the title report's owners are used.")
+            messages.append("COLLATERAL has no owners, so the title report's owners are used. Correct them here if "
+                            "needed.")
+        if owners.status == "completed":
+            added = [o for o in owners.owners if o not in c.collateral_owners[0]]
+            messages.append(f"The COLLATERAL owners do not add up: {owners.count_problem}. The title report names "
+                            f"the same owners plus {'; '.join(added)}, so the tool adds "
+                            f"{'them' if len(added) > 1 else 'this owner'}. Correct the owners here if needed.")
+        elif owners.count_problem:
+            messages.append(f"The COLLATERAL owners do not add up: {owners.count_problem}. Check them and type the "
+                            "right owners here if needed.")
+        if owners.split_note:
+            messages.append(f"In COLLATERAL, {owners.split_note}. Type the right owners here if needed.")
         outsiders = c.non_borrower_owners()
         if outsiders:
             messages.append(f"Owner(s) {', '.join(outsiders)} are not borrowers: third-party mortgage. This SI "
                             "will be left out of the .DAT file (asset-owner rows are not supported). If they are "
                             "borrowers, type the owners using the borrowers' names.")
         if messages:
-            add("SI", "OWNERS", " ".join(messages) + " To correct, type the owners separated by ;",
-                "; ".join(owners.lms_owners), "; ".join(owners.pdf_owners), "; ".join(owners.owners))
+            add("SI", "OWNERS", " ".join(messages) + " (Owners separated by ;)",
+                lms_text, "; ".join(owners.pdf_owners), "; ".join(owners.owners))
 
-        # owner names that match a borrower only probably
+        # owners matched to borrowers on similar names: what the tool decided
         answers = {cif: value for (cl, cif, key), value in carried.per_owner.items()
                    if cl == coll and key == "OWNER_MATCH"}
         by_cif = {b["neo_cif"]: b for b in c.borrowers}
         for link in c.owner_links:
-            if link.probable:
-                group = match_groups[(app, link.neo_cif, normalise_name(link.owner))]
-                if group[0] != coll:
-                    continue          # asked on the application's first collateral with this owner
-                also = (f" The answer is used for every collateral of this application with this owner: "
-                        f"{', '.join(group)}." if len(group) > 1 else "")
-                add("BOR", "OWNER_MATCH",
-                    f"Is owner '{link.owner}' the same person as borrower '{link.borrower_name}'? Type Y or N. "
-                    f"Until it is answered the SI is held (the values shown assume Y).{also}",
-                    "; ".join(owners.lms_owners), "; ".join(owners.pdf_owners), f"Y (name score {link.score})",
-                    link.neo_cif, link.borrower_name, choices="YES_NO")
+            if not link.uncertain:
+                continue
+            group = match_groups[(app, link.near_cif, normalise_name(link.owner))]
+            if group[0] != coll:
+                continue              # listed on the application's first collateral with this owner
+            also = (f" An answer here also applies to the other collateral(s) of this application with this "
+                    f"owner: {', '.join(group[1:])}." if len(group) > 1 else "")
+            if link.neo_cif:
+                what = (f"Owner '{link.owner}' is taken to be borrower '{link.near_name}' (similar names). If they "
+                        f"are different people, type N.{also}")
+                used = "Y (same person)"
+            else:
+                what = (f"Owner '{link.owner}' is taken to be a different person from borrower '{link.near_name}': "
+                        "the given names differ, which usually means a relative, so this owner is not a borrower. "
+                        f"If they are the same person, type Y.{also}")
+                used = "N (different person)"
+            add("BOR", "OWNER_MATCH", what, lms_text, "; ".join(owners.pdf_owners), used,
+                link.near_cif, link.near_name, choices="YES_NO")
         for cif, value in answers.items():
-            add("BOR", "OWNER_MATCH", "Answer typed in an earlier batch: is this owner the same person as the "
-                "borrower?", "; ".join(owners.lms_owners), "; ".join(owners.pdf_owners), "",
+            owner = next((link.owner for link in c.owner_links if link.near_cif == cif), "")
+            which = f"owner '{owner}'" if owner else "this owner"
+            used = "Y (same person)" if value.upper().startswith("Y") else "N (different person)"
+            add("BOR", "OWNER_MATCH", f"Typed in an earlier batch: is {which} the same person as this borrower "
+                "(Y/N)?", lms_text, "; ".join(owners.pdf_owners), used,
                 cif, by_cif.get(cif, {}).get("name", ""), your=value, choices="YES_NO")
         for (cl, cif, key), value in carried.per_owner.items():
             if cl == coll and key != "OWNER_MATCH":
@@ -590,7 +609,8 @@ def _write_read_me(sheet, batch_name, counts):
          "is used on every SI of that application.", False),
         (f"Collaterals ({counts['collaterals']} rows): one row per collateral that needs a value.", False),
         (f"Check and correct ({counts['checks']} rows): LMS and title report differences shown side by side, "
-         "title reports that may belong to another property, owner names to confirm. Type in 'Your value' "
+         "title reports that may belong to another property (answer these), and the owner decisions the tool "
+         "made on its own (owners from COLLATERAL, names that only resemble a borrower's). Type in 'Your value' "
          "only if the value the tool will use is wrong. Empty rows at the bottom let you correct any other "
          "value.", False),
         ("", False),

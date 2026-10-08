@@ -84,7 +84,7 @@ def summarise(blocks, log):
     log(f"  values still needed or to confirm: {needed}")
     log(f"  LMS / title report differences:    {conflicts}")
     if held:
-        log(f"  held until a question in Check and correct is answered: {short_list(held)}")
+        log(f"  held (title report may be for another property): {short_list(held)}")
     if tpm:
         log(f"  third-party mortgages (left out of the .DAT file): {short_list(tpm)}")
 

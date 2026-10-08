@@ -8,9 +8,8 @@ file and listed with its reasons; warnings are listed but do not stop an SI.
 
 SIs are also left out when they are a third-party mortgage (asset-owner rows
 are not supported yet), when they wait for an answer (held in step 2: a title
-report that may belong to another property, or an owner name that only
-probably matches a borrower), or when they are already in an earlier .DAT
-file.
+report that may belong to another property), or when they are already in an
+earlier .DAT file.
 """
 import re
 from dataclasses import dataclass, field
@@ -189,6 +188,14 @@ RULES = {"SI": (si_row.FIELDS, SI_RULES), "IMM": (imm_row.FIELDS, IMM_RULES), "B
          "CHG": (chg_row.FIELDS, CHG_RULES)}
 
 
+# what to do when these mandatory values are empty
+EMPTY_MESSAGES = {
+    ("SI", "NUMBER_OF_ASSET_OWNERS"): "is empty: no owners are known for this collateral. Type the owners (OWNERS) in "
+                                      "the required-details file and run step 2 again",
+    ("SI", "NUMBER_OF_BORROWERS"): "is empty: CKYC has no borrowers for this application",
+}
+
+
 def check_values(kind, values, masters, label, errors):
     fields, rules = RULES[kind]
     row = dict(zip(fields, values))
@@ -202,7 +209,7 @@ def check_values(kind, values, masters, label, errors):
         mandatory, rule = rules.get(name, (False, None))
         if not value:
             if mandatory:
-                errors.append((label, name, "is empty but mandatory"))
+                errors.append((label, name, EMPTY_MESSAGES.get((kind, name), "is empty but mandatory")))
             continue
         if rule == "code":
             problem = CODES[name](value, masters)

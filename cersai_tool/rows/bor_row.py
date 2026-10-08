@@ -91,13 +91,15 @@ def col_03_borrower_type(c, b, serial, row):
 
 # Column 4 - IS_ASSET_OWNER (1 or 0)
 # Where it comes from: the property owners decided for the SI row (COLLATERAL
-#   owners checked against the title report - see NUMBER_OF_ASSET_OWNERS).
-#   1 when one of the owners is this borrower (names compared ignoring titles,
-#   spelling and initials), otherwise 0.
-# Rules: a name that only probably matches counts as the same person, but the
-#   SI is held until someone confirms it in the Check and correct sheet. With
-#   several collaterals on one application, this is worked out per collateral:
-#   the same borrower can own one property and not another.
+#   "Owner Name" first; the title report when COLLATERAL has none - see
+#   NUMBER_OF_ASSET_OWNERS). 1 when one of the owners is this borrower (names
+#   compared ignoring titles, spelling, initials and a relative's name after
+#   S/O, D/O or W/O), otherwise 0.
+# Rules: similar names count as the same person and names whose given names
+#   differ (relatives) do not; such decisions are listed in the Check and
+#   correct sheet, where a Y or N changes them. With several collaterals on one
+#   application, this is worked out per collateral: the same borrower can own
+#   one property and not another.
 def col_04_is_asset_owner(c, b, serial, row):
     typed = c.pov(b, "IS_ASSET_OWNER")
     if typed is not None:
@@ -106,8 +108,8 @@ def col_04_is_asset_owner(c, b, serial, row):
     if not links:
         return derived("IS_ASSET_OWNER", "0", "not one of the property owners")
     note = "owner: " + "; ".join(link.owner for link in links)
-    if any(link.probable for link in links):
-        note += " (uncertain name match: confirm in Check and correct)"
+    if any(link.uncertain for link in links):
+        note += " (similar names: listed in Check and correct)"
     return derived("IS_ASSET_OWNER", "1", note)
 
 

@@ -8,6 +8,11 @@ Writes (replacing earlier dummy files):
     Dummy input data/Dummy Legal/*.pdf
     Dummy input data/Dummy data cases.md    (what each application tests)
 
+The hand-made applications each test a kind of data found in the real
+extracts. Regular applications are then generated (with a fixed seed, so every
+run gives the same files) until CKYC has exactly CKYC_ROWS data rows; each one
+also gets its COLLATERAL rows and a title report for every collateral.
+
 Every person, company, PAN, phone number, e-mail and law firm is made up.
 PIN codes and place names are real, because the tool looks them up in the
 CERSAI masters. The files copy the layout of the real LMS extracts: the same
@@ -17,6 +22,10 @@ built the way the LMS queries build them: CKYC has one row per customer x ID
 document x address; COLLATERAL has one row per loan account x customer x
 owner x customer address.
 """
+import difflib
+import math
+import random
+from datetime import date, timedelta
 from pathlib import Path
 
 import openpyxl
@@ -96,11 +105,14 @@ def loan(number, status, date, sanctioned, disbursed=None):
 
 
 def collateral(coll, cms, ptype, address, pin, owners, *, built=None, carpet=None, classification="Others",
-               nature="FREEHOLD", purpose="Self Occupied", ownership="Others", age=8, market=None, pdf=None):
-    """owners: [(name as typed in the LMS, percentage share)]; pdf: a title-report spec or None."""
+               nature="FREEHOLD", purpose="Self Occupied", ownership="Others", age=8, market=None, pdf=None,
+               status=None):
+    """owners: [(name as typed in the LMS, percentage share)]; pdf: a title-report spec or None;
+    status: the Ownership Status (default Single for one owner, Joint for more)."""
     return {"coll": coll, "cms": cms, "ptype": ptype, "address": address, "pin": pin, "owners": owners,
             "built": built, "carpet": carpet, "classification": classification, "nature": nature,
-            "purpose": purpose, "ownership": ownership, "age": age, "market": market, "pdf": pdf}
+            "purpose": purpose, "ownership": ownership, "age": age, "market": market, "pdf": pdf,
+            "status": status}
 
 
 def application(app, branch, first_disbursal, customers, collaterals, loans, *, received="15-MAY-26",
@@ -326,7 +338,8 @@ def build_applications():
              "valid one in COLLATERAL (used); plot number from the LMS address and khasra (survey) number from the "
              "title report; title-report area matches the built-up area, not the carpet area."))
 
-    # D08 - Haryana revenue numbers; area only in the title report; PIN in two districts.
+    # D08 - Haryana revenue numbers; area only in the title report; PIN in two districts; COLLATERAL
+    # misses an owner (shares add up to 50%), the title report names her.
     apps.append(application(
         "APPL00090008", "Gurugram", "29-08-2026",
         [person(90081, "AMIT MALHOTRA", "primary", "12-DEC-83", "AJKPM3344F",
@@ -338,15 +351,18 @@ def build_applications():
         [collateral("COLL00090008", "CMS00090008", "RESIDENTIAL",
                     "Residential Apartment No. 9, on Second Floor, in Block-C, Rosewood City, Sohna Road, Khewat No. "
                     "123, Mustatil No. 45, Killa No. 12/2, Village Badshahpur, District Gurgaon, Gurgaon, Haryana- "
-                    "122502, India", "122502", [("Amit Malhotra", 100)],
-                    pdf=report("A", "Amit Malhotra", "Mr. Amit Malhotra",
+                    "122502, India", "122502", [("Amit Malhotra", 50)], status="Joint",
+                    pdf=report("A", "Amit Malhotra", "Mr. Amit Malhotra and Mrs. Neha Malhotra",
                                "Residential Apartment No. 9 on the Second Floor, adm. 111.48 Sq. Mtrs., Carpet area, "
                                "in Block-C of the project known as Rosewood City, constructed on land bearing Khewat "
                                "No. 123, Mustatil No. 45, Killa No. 12/2, situated at Village Badshahpur, Tehsil and "
                                "District Gurgaon, Haryana."))],
         [loan(900801, "A", "29-AUG-26", 9500000)],
         case="Haryana khewat/mustatil/killa numbers; no area in COLLATERAL, so the title report's area in sq. m is "
-             "used (unit 7); PIN 122502 belongs to two districts (Gurgaon, Rewari) and the address names Gurgaon."))
+             "used (unit 7); PIN 122502 belongs to two districts (Gurgaon, Rewari) and the address names Gurgaon. "
+             "COLLATERAL lists one owner with a 50% share and Ownership Status Joint, so an owner is missing; the "
+             "title report names Amit and his wife Neha (a co-applicant), so Neha is added from the title report "
+             "and the Check and correct sheet says so."))
 
     # D09 - HUF; Delhi 'Property bearing No.', khasra; mixed usage; no title report.
     apps.append(application(
@@ -571,7 +587,7 @@ def build_applications():
         case="No owners in COLLATERAL and no title report: owners must be typed; property type PG (residential); "
              "'P.No.' = plot number; a co-applicant with no address in CKYC or COLLATERAL (address needed)."))
 
-    # D20 - the title report names an extra owner who is not a borrower: third-party mortgage.
+    # D20 - the title report names an extra owner that COLLATERAL does not have.
     vashi = "Flat No. 504, Sai Darshan CHS, Sector 17, Vashi, Navi Mumbai, Thane, Maharashtra- 400703, India"
     apps.append(application(
         "APPL00090020", "VASHI BRANCH", "02-09-2026",
@@ -587,12 +603,13 @@ def build_applications():
                                "Ltd.', constructed on the land bearing Plot No. 23, Sector 17 of Village Vashi, Navi "
                                "Mumbai, Taluka and District Thane"))],
         [loan(902001, "A", "02-SEP-26", 6800000)],
-        case="COLLATERAL and the title report name different owners: the title report's owners are used and "
-             "flagged; its extra owner (Radha Nair) is not a borrower, so this is a third-party mortgage and the "
-             "SI is left out of the .DAT file; plot number only in the title report. Note: the law firm's own "
-             "PIN (400703) matches this property's PIN by chance."))
+        case="COLLATERAL names one owner (Arjun Nair, 100%, Single) and the title report two (Arjun and Radha "
+             "Nair). COLLATERAL comes first and its shares add up, so Arjun alone is used (he is a borrower, so "
+             "the SI is filed); the title report's names are shown in the Check and correct sheet, where the "
+             "owners can be typed if the title report is right. Plot number only in the title report. Note: the "
+             "law firm's own PIN (400703) matches this property's PIN by chance."))
 
-    # D21 - an owner name that only probably matches a borrower.
+    # D21 - an owner name that only resembles a borrower's name.
     apps.append(application(
         "APPL00090021", "Hyderabad", "19-08-2026",
         [person(90211, "BHANU KATAM", "primary", "12-JUN-87", "BUGPK4545U",
@@ -609,9 +626,10 @@ def build_applications():
                     "Hyderabad, Telangana- 500081, India", "500081", [("Smt. Banu K", 100)], built=1250, carpet=1050,
                     purpose="Rented")],
         [loan(902101, "A", "19-AUG-26", 5600000)],
-        case="Two flats with the same owner 'Smt. Banu K', who only probably matches borrower 'BHANU KATAM': the "
-             "Check and correct sheet asks Y/N once, and the answer is used for both collaterals; both survey and "
-             "plot numbers in the address; no title reports."))
+        case="Two flats with the same owner 'Smt. Banu K', whose name only resembles borrower 'BHANU KATAM': "
+             "the tool takes them to be the same person and files both SIs, and lists the decision once in the "
+             "Check and correct sheet (an N typed there would apply to both collaterals); both survey and plot "
+             "numbers in the address; no title reports."))
 
     # D22 - the title report belongs to a different property: SI held.
     apps.append(application(
@@ -870,6 +888,100 @@ def build_applications():
              "so only the flat number gives it away: because it is the flat of the other collateral of the same "
              "application, both SIs are held until someone answers PDF OK / WRONG PDF (or renames the files and "
              "runs step 1 again)."))
+
+    # D32 - husband and wife are both borrowers and both owners; the CKYC names are written surname
+    # first, and each name contains the other's given name.
+    patel_home = "B-12, Shreeji Bungalows, Near Thaltej Cross Roads, Thaltej, Ahmedabad, Gujarat- 380054, India"
+    apps.append(application(
+        "APPL00090032", "AHMEDABAD", "03-09-2026",
+        [person(90321, "PATEL BHARAT KANTIBHAI", "primary", "21-JUN-74", "AGBPP3221Q", first="PATEL",
+                middle="BHARAT", last="KANTIBHAI", addresses=[("ResidentialAddress", patel_home)]),
+         person(90322, "PATEL SONALBEN BHARATBHAI", "Co-Applicant", "09-JAN-78", "BHCPP3222R", first="PATEL",
+                middle="SONALBEN", last="BHARATBHAI", addresses=[("ResidentialAddress", patel_home)])],
+        [collateral("COLL00090044", "CMS00090044", "RESIDENTIAL",
+                    "Bungalow No. B-12, Shreeji Bungalows, Survey No. 118/2, Near Thaltej Cross Roads, Thaltej, "
+                    "Ahmedabad, Gujarat- 380054, India", "380054",
+                    [("Bharatbhai Patel", 50), ("Sonalben Bharatbhai Patel", 50)], built=2400, carpet=2100,
+                    pdf=report("B", "Bharat Kantibhai Patel", "Mr. Bharatbhai K. Patel and Mrs. Sonalben B. Patel",
+                               "Bungalow No. B-12 admeasuring 195.10 sq.mtr built up area in the scheme known as "
+                               "Shreeji Bungalows constructed on the land bearing Survey No. 118/2 situated at "
+                               "Village Thaltej, Taluka Ghatlodia, District Ahmedabad")),
+         collateral("COLL00090045", "CMS00090045", "COMMERCIAL",
+                    "Office No. 407, 4th Floor, Shivalik Business Centre, Near Rajpath Club, Bodakdev, Ahmedabad, "
+                    "Gujarat- 380054, India", "380054", [("Bharatbhai Patel", 100)], built=650, carpet=540,
+                    purpose="Rented")],
+        [loan(903201, "A", "03-SEP-26", 12500000)],
+        case="Husband and wife are both borrowers, and CKYC writes their names surname first ('PATEL BHARAT "
+             "KANTIBHAI', 'PATEL SONALBEN BHARATBHAI'). The bungalow is owned by 'Bharatbhai Patel' and 'Sonalben "
+             "Bharatbhai Patel': each name contains the other's given name, so each owner must be linked to the "
+             "right spouse (each borrower is linked to one owner of a property at most). The office is the "
+             "husband's alone: IS_ASSET_OWNER 1 for him and 0 for her on that SI."))
+
+    # D33 - only the husband is a borrower, the wife co-owns: third-party mortgage; and a second
+    # collateral with exactly the same address (different area and Global collateral No).
+    kore_plot = ("Agriculture Plot No. 7, Gat No. 233 and 233/1, Kore Vasti, Hotgi Road, Taluka North Solapur, "
+                 "Solapur, Maharashtra- 413002, India")
+    apps.append(application(
+        "APPL00090033", "Pune", "17-08-2026",
+        [person(90331, "MAHADEV SHIVAPPA KORE", "primary", "12-APR-69", "ANKPK3331S",
+                addresses=[("ResidentialAddress", "House No. 45, Kore Vasti, Hotgi Road, Solapur, Maharashtra- "
+                                                  "413002, India")]),
+         firm(90332, "KORE AGRO SERVICES", "Sole Proprietorship Firm", "Co-Applicant", "15-JUN-12", "ANKPK3331S",
+              addresses=[("OfficeAddress", "Shop No. 2, Market Yard, Solapur, Maharashtra- 413002, India")])],
+        [collateral("COLL00090046", "CMS00090046", "PLOT", kore_plot, "413002",
+                    [("Mahadev Shivappa Kore", 50), ("Savita Mahadev Kore", 50)], carpet=16000,
+                    nature="GRAM PANCHAYAT", purpose="Vacant"),
+         collateral("COLL00090047", "CMS00090047", "PLOT", kore_plot, "413002", [("Mahadev Shivappa Kore", 100)],
+                    carpet=1500, nature="GRAM PANCHAYAT", purpose="Vacant")],
+        [loan(903301, "A", "17-AUG-26", 3500000)],
+        case="Only the husband is a borrower. The first plot is co-owned by his wife 'Savita Mahadev Kore', whose "
+             "name contains his given name and surname: she is not him, so that SI is a third-party mortgage. The "
+             "second collateral has exactly the same address as the first (different area and Global collateral "
+             "No, as in one real application): both are flagged to check that the same property is not recorded "
+             "twice."))
+
+    # D34 - an Owner Name cell holding two people; CKYC names with WO / DO (a relative's name follows).
+    iyer_home = ("Flat No. 3B, Third Floor, Lakshmi Apartments, Door No. 12, Kamarajar Salai, Mylapore, Chennai, "
+                 "Tamil Nadu- 600004, India")
+    apps.append(application(
+        "APPL00090034", "Chennai", "05-09-2026",
+        [person(90341, "SURESH IYER", "primary", "14-FEB-71", "AKZPI3441T",
+                addresses=[("ResidentialAddress", iyer_home)]),
+         person(90342, "KALPANA WO SURESH IYER", "Co-Applicant", "02-MAR-75", "BMZPI3442U", first="KALPANA",
+                middle="WO", last="SURESH IYER", addresses=[("ResidentialAddress", iyer_home)]),
+         person(90343, "MEENA DO SURESH IYER", "Co-Applicant", "19-JUL-98", "CNZPI3443V", first="MEENA",
+                middle="DO", last="SURESH IYER", addresses=[("ResidentialAddress", iyer_home)])],
+        [collateral("COLL00090048", "CMS00090048", "RESIDENTIAL", iyer_home, "600004",
+                    [("Suresh Iyer and Kalpana Iyer", 100)], built=1100, carpet=950,
+                    pdf=report("A", "Suresh Iyer", "Mr. Suresh Iyer and Mrs. Kalpana Iyer",
+                               "Flat No. 3B on the Third Floor admeasuring 1100 sq.ft. built up area in the building "
+                               "known as Lakshmi Apartments, Door No. 12, Kamarajar Salai, Mylapore, constructed on "
+                               "the land bearing Survey No. 1654/2 of Mylapore Village, Mylapore-Triplicane Taluk, "
+                               "Chennai District"))],
+        [loan(903401, "A", "05-SEP-26", 7200000)],
+        case="COLLATERAL writes both owners in one Owner Name cell ('Suresh Iyer and Kalpana Iyer', 100%, Single), "
+             "as in three real collaterals: each part is a borrower, so the cell is taken as two owners (a company "
+             "name with 'and', such as 'Jamson Machine and Tools', stays whole). CKYC writes the wife and the "
+             "daughter as 'KALPANA WO SURESH IYER' and 'MEENA DO SURESH IYER' (as in the real CKYC): the words "
+             "after WO / DO name the husband or father and are ignored when matching, so Kalpana is linked to "
+             "the owner 'Kalpana Iyer' (listed for review) and the daughter is not an owner."))
+
+    # D35 - the owner's name is part of the borrower's name: her father or husband, not her.
+    rs_puram = "Door No. 14/22, Ground Floor, Venkatasamy Road West, R.S. Puram, Coimbatore, Tamil Nadu- 641002, India"
+    apps.append(application(
+        "APPL00090035", "Coimbatore", "08-09-2026",
+        [person(90351, "KAVITHA GOPALAKRISHNAN", "primary", "11-NOV-84", "BQZPG3551W",
+                addresses=[("ResidentialAddress", rs_puram)]),
+         firm(90352, "SRI KAVI TEXTILES", "Sole Proprietorship Firm", "Co-Applicant", "01-APR-15", "BQZPG3551W",
+              addresses=[("OfficeAddress", "No. 45, Oppanakara Street, Town Hall, Coimbatore, Tamil Nadu- 641001, "
+                                           "India")])],
+        [collateral("COLL00090049", "CMS00090049", "RESIDENTIAL", rs_puram, "641002", [("Gopalakrishnan", 100)],
+                    built=1800, carpet=1500)],
+        [loan(903501, "A", "08-SEP-26", 4800000)],
+        case="The only owner, 'Gopalakrishnan', is part of the borrower's name 'KAVITHA GOPALAKRISHNAN' (her father's "
+             "or husband's name, as in three real collaterals): the given names differ, so he is taken to be a "
+             "different person and the SI is a third-party mortgage (left out). The decision is listed in the "
+             "Check and correct sheet, where Y would link him to her."))
     return apps
 
 
@@ -880,6 +992,575 @@ EXTRA_PDFS = [
     ("Title report APPL00090021.pdf", "APPL00090021", "COLL00090024",
      "a name that does not follow <APPL>_<COLL>.pdf (reported)"),
 ]
+
+
+# --------------------------------------------------------------------------
+# Regular records: generated to give the CKYC extract its size
+# --------------------------------------------------------------------------
+# The applications above are hand-made: each one tests a kind of data found in
+# the real extracts. The ones below are ordinary records, generated until the
+# CKYC extract has exactly CKYC_ROWS data rows. Each one also gets its COLLATERAL
+# rows and, for every collateral, a title report that agrees with the LMS. The
+# proportions follow the real extracts: mostly 3 or 4 customers per
+# application; one CKYC row per customer, plus one per extra ID document (a
+# firm's GST, Udyam or CIN number); one collateral per application in nine
+# cases out of ten; one or two owners, all of them borrowers. A fixed seed
+# makes every run produce the same records.
+CKYC_ROWS = 200
+SEED = 20261008
+
+# Real places: the PIN is in the CERSAI masters with a single district, and the
+# tool finds the city in the address. (branch, locality, city, state, PIN,
+# district, the land-number label used there - "Plot No." where land is
+# allotted in plots -, streets, leasehold land)
+PLACES = [
+    ("Mumbai 1", "Andheri East", "Mumbai", "Maharashtra", "400069", "Mumbai Suburban", "CTS No.",
+     ("Sahar Road", "Chakala Road"), False),
+    ("Mumbai 2", "Malad West", "Mumbai", "Maharashtra", "400064", "Mumbai Suburban", "CTS No.",
+     ("Marve Road", "Liberty Garden Road"), False),
+    ("Mumbai 2", "Borivali West", "Mumbai", "Maharashtra", "400092", "Mumbai Suburban", "CTS No.",
+     ("S. V. Road", "L. T. Road"), False),
+    ("Mumbai 1", "Chembur", "Mumbai", "Maharashtra", "400071", "Mumbai Suburban", "CTS No.",
+     ("R. C. Marg", "Central Avenue Road"), False),
+    ("Mumbai 1", "Mulund West", "Mumbai", "Maharashtra", "400080", "Mumbai Suburban", "CTS No.",
+     ("L. B. S. Marg", "Zaver Road"), False),
+    ("Thane", "Majiwada", "Thane", "Maharashtra", "400601", "Thane", "Survey No.",
+     ("Majiwada Road", "Kapurbawdi Road"), False),
+    ("Thane", "Dombivli East", "Thane", "Maharashtra", "421201", "Thane", "Survey No.",
+     ("Manpada Road", "Tilak Road"), False),
+    ("VASHI BRANCH", "Kharghar", "Navi Mumbai", "Maharashtra", "410210", "Raigad", "Plot No.",
+     ("Sector 12 Road", "Utsav Chowk Road"), True),
+    ("Pune", "Kothrud", "Pune", "Maharashtra", "411038", "Pune", "Survey No.", ("Paud Road", "Karve Road"), False),
+    ("Pune", "Hadapsar", "Pune", "Maharashtra", "411028", "Pune", "Survey No.",
+     ("Solapur Road", "Magarpatta Road"), False),
+    ("Pune", "Wakad", "Pune", "Maharashtra", "411057", "Pune", "Survey No.",
+     ("Datta Mandir Road", "Kaspate Vasti Road"), False),
+    ("Nashik", "Gangapur Road", "Nashik", "Maharashtra", "422013", "Nashik", "Survey No.",
+     ("College Road", "Anandvalli Road"), False),
+    ("Nagpur", "Dharampeth", "Nagpur", "Maharashtra", "440010", "Nagpur", "Khasra No.",
+     ("West High Court Road", "Ram Nagar Road"), False),
+    ("Bangalore", "Jayanagar", "Bangalore", "Karnataka", "560041", "Bengaluru Urban", "Sy. No.",
+     ("9th Main Road", "30th Cross Road"), False),
+    ("Bangalore 2", "Whitefield", "Bangalore", "Karnataka", "560066", "Bengaluru Urban", "Sy. No.",
+     ("ITPL Main Road", "Varthur Road"), False),
+    ("Bangalore", "Rajajinagar", "Bangalore", "Karnataka", "560010", "Bengaluru Urban", "Sy. No.",
+     ("Dr Rajkumar Road", "West of Chord Road"), False),
+    ("Mysore", "Vijayanagar", "Mysore", "Karnataka", "570017", "Mysuru", "Sy. No.",
+     ("Hunsur Road", "Vijayanagar Main Road"), False),
+    ("Hyderabad", "Kukatpally", "Hyderabad", "Telangana", "500072", "Medchal-Malkajgiri", "Survey No.",
+     ("JNTU Road", "Kukatpally Main Road"), False),
+    ("Hyderabad", "Miyapur", "Hyderabad", "Telangana", "500049", "Medchal-Malkajgiri", "Survey No.",
+     ("Allwyn Colony Road", "Miyapur Main Road"), False),
+    ("Hyderabad", "Dilsukhnagar", "Hyderabad", "Telangana", "500060", "Ranga Reddy", "Survey No.",
+     ("Chaitanyapuri Road", "Kothapet Road"), False),
+    ("Chennai", "Anna Nagar", "Chennai", "Tamil Nadu", "600040", "Chennai", "S. No.",
+     ("2nd Avenue", "Shanthi Colony Main Road"), False),
+    ("Chennai", "Velachery", "Chennai", "Tamil Nadu", "600042", "Chennai", "S. No.",
+     ("Velachery Main Road", "Taramani Link Road"), False),
+    ("Coimbatore", "Saibaba Colony", "Coimbatore", "Tamil Nadu", "641011", "Coimbatore", "S. No.",
+     ("NSR Road", "Bharathi Park Road"), False),
+    ("AHMEDABAD", "Navrangpura", "Ahmedabad", "Gujarat", "380009", "Ahmedabad", "Survey No.",
+     ("C. G. Road", "University Road"), False),
+    ("AHMEDABAD", "Bopal", "Ahmedabad", "Gujarat", "380058", "Ahmedabad", "Survey No.",
+     ("Bopal Ghuma Road", "South Bopal Road"), False),
+    ("Surat", "Adajan", "Surat", "Gujarat", "395009", "Surat", "R.S. No.",
+     ("Adajan Patiya Road", "Honey Park Road"), False),
+    ("Vadodara", "Gotri", "Vadodara", "Gujarat", "390021", "Vadodara", "Survey No.",
+     ("Gotri Road", "Sevasi Road"), False),
+    ("Jaipur", "Malviya Nagar", "Jaipur", "Rajasthan", "302017", "Jaipur", "Khasra No.",
+     ("Malviya Nagar Main Road", "Jawahar Lal Nehru Marg"), False),
+    ("Jaipur", "Vaishali Nagar", "Jaipur", "Rajasthan", "302021", "Jaipur", "Khasra No.",
+     ("Queens Road", "Amrapali Marg"), False),
+    ("Delhi 1", "Rohini", "North West Delhi", "Delhi", "110085", "North West Delhi", "Khasra No.",
+     ("Sector 7 Road", "Rohini Road"), False),
+    ("Delhi 2", "Dwarka", "South West Delhi", "Delhi", "110075", "South West Delhi", "Khasra No.",
+     ("Sector 6 Road", "Dwarka Road"), False),
+    ("Delhi 2", "Janakpuri", "West Delhi", "Delhi", "110058", "West Delhi", "Khasra No.",
+     ("Pankha Road", "Janakpuri Road"), False),
+    ("Gurugram", "Sector 56", "Gurgaon", "Haryana", "122011", "Gurugram", "Khasra No.",
+     ("Golf Course Extension Road", "Sector 56 Road"), False),
+    ("Noida", "Sector 62", "Noida", "Uttar Pradesh", "201309", "Gautam Buddha Nagar", "Plot No.",
+     ("Sector 62 Road", "NH 24 Service Road"), True),
+    ("Lucknow", "Gomti Nagar", "Lucknow", "Uttar Pradesh", "226010", "Lucknow", "Khasra No.",
+     ("Vibhuti Khand Road", "Patrakarpuram Road"), False),
+    ("Indore", "Vijay Nagar", "Indore", "Madhya Pradesh", "452010", "Indore", "Khasra No.",
+     ("A. B. Road", "Ring Road"), False),
+    ("Bhopal", "Arera Colony", "Bhopal", "Madhya Pradesh", "462016", "Bhopal", "Khasra No.",
+     ("E-5 Road", "Arera Hills Road"), False),
+    ("Kolkata", "Salt Lake", "Kolkata", "West Bengal", "700091", "North 24 Parganas", "Plot No.",
+     ("Sector V Road", "Broadway Road"), True),
+    ("Kochi", "Kakkanad", "Kochi", "Kerala", "682030", "Ernakulam", "Sy. No.",
+     ("Seaport Airport Road", "Infopark Road"), False),
+    ("Ludhiana", "Model Town", "Ludhiana", "Punjab", "141002", "Ludhiana", "Khasra No.",
+     ("Model Town Road", "Pakhowal Road"), False),
+]
+# state -> (GST state code, Udyam state code, CIN state code), and how its
+# families write their names (see Family.full_name)
+STATE_CODES = {"Maharashtra": ("27", "MH", "MH"), "Karnataka": ("29", "KR", "KA"), "Telangana": ("36", "TS", "TG"),
+               "Tamil Nadu": ("33", "TN", "TN"), "Gujarat": ("24", "GJ", "GJ"), "Rajasthan": ("08", "RJ", "RJ"),
+               "Delhi": ("07", "DL", "DL"), "Haryana": ("06", "HR", "HR"), "Uttar Pradesh": ("09", "UP", "UP"),
+               "Madhya Pradesh": ("23", "MP", "MP"), "West Bengal": ("19", "WB", "WB"),
+               "Kerala": ("32", "KL", "KL"), "Punjab": ("03", "PB", "PB")}
+NAMING = {"Maharashtra": "west", "Gujarat": "gujarat", "Rajasthan": "north", "Delhi": "north", "Haryana": "north",
+          "Uttar Pradesh": "north", "Madhya Pradesh": "north", "Punjab": "punjab", "Karnataka": "karnataka",
+          "Telangana": "telugu", "Tamil Nadu": "tamil", "Kerala": "kerala", "West Bengal": "bengal"}
+# given names of men and women, surnames ("" = none: the initial is used), and
+# the names of the older generation (fathers)
+NAMES = {
+    "west": {"men": ["RAHUL", "SACHIN", "SANDEEP", "PRASHANT", "NITIN", "MAHESH", "SANTOSH", "MANGESH", "TUSHAR",
+                     "YOGESH", "SWAPNIL", "AMOL"],
+             "women": ["PRIYA", "SNEHA", "SWATI", "MANISHA", "KAVITA", "RUPALI", "SHWETA", "VAISHALI", "MADHURI",
+                       "ASHWINI", "PALLAVI", "TEJASWINI"],
+             "surnames": ["PATIL", "JADHAV", "PAWAR", "SHINDE", "KULKARNI", "DESHPANDE", "GAIKWAD", "CHAVAN",
+                          "SALUNKHE", "KALE", "DESHMUKH", "MANE", "LONDHE", "WAGH"],
+             "elders": ["VIJAY", "SURESH", "RAMESH", "DATTATRAY", "GANPAT", "SHANKAR", "VASANT", "PRAKASH", "ASHOK",
+                        "SHRIKANT", "DILIP", "ARUN"]},
+    "gujarat": {"men": ["KETAN", "JIGNESH", "HITESH", "PARESH", "NILESH", "MEHUL", "CHIRAG", "DHAVAL", "KALPESH",
+                        "BHAVIN", "TEJAS", "VIRAL"],
+                "women": ["HETAL", "NISHA", "KOMAL", "BHAVNA", "JAGRUTI", "DHARA", "MITAL", "RINKU", "PAYAL",
+                          "KINJAL"],
+                "surnames": ["PATEL", "SHAH", "MEHTA", "DESAI", "PARIKH", "MODI", "TRIVEDI", "PANCHAL", "SONI",
+                             "THAKKAR"],
+                "elders": ["RAMESH", "DAHYA", "KANTI", "MANU", "NAVIN", "JAYANTI", "ARVIND", "HASMUKH", "PRAVIN"]},
+    "north": {"men": ["ROHIT", "VIKAS", "MANOJ", "SANJAY", "RAKESH", "DEEPAK", "PANKAJ", "ANKIT", "GAURAV", "VIVEK",
+                      "NARESH", "ANUJ"],
+              "women": ["NEHA", "RITU", "ANITA", "SHALINI", "PREETI", "MEENAKSHI", "SEEMA", "AARTI", "SONIA",
+                        "RASHMI"],
+              "surnames": ["SHARMA", "VERMA", "GUPTA", "AGARWAL", "YADAV", "JAIN", "SAXENA", "MISHRA", "TIWARI",
+                           "RATHORE", "KHANDELWAL", "MALHOTRA", "ARORA", "SRIVASTAVA"],
+              "elders": ["RAMESH", "SURESH", "MAHESH", "OM PRAKASH", "RAJENDRA", "SATISH", "KRISHAN", "VINOD"]},
+    "punjab": {"men": ["GURPREET", "BALWINDER", "JASPAL", "KULDEEP", "AMRIK", "TEJINDER", "HARVINDER"],
+               "women": ["HARLEEN", "NAVNEET", "SIMRAN", "MANDEEP", "PARMINDER"],
+               "surnames": ["GILL", "SIDHU", "GREWAL", "DHILLON", "SANDHU", "BAJWA"],
+               "elders": ["GURDEV", "SURJIT", "HARBANS", "MOHINDER", "JOGINDER"]},
+    "karnataka": {"men": ["MANJUNATH", "RAGHAVENDRA", "NAGARAJ", "GIRISH", "SHIVAKUMAR", "HARISH", "PRAVEEN",
+                          "SANTHOSH", "CHANDRASHEKAR"],
+                  "women": ["SHILPA", "SOWMYA", "PAVITHRA", "ANITHA", "RASHMI", "DEEPA", "VANITHA", "NAYANA"],
+                  "surnames": ["GOWDA", "HEGDE", "SHETTY", "BHAT", "", "", ""],
+                  "elders": ["KRISHNAPPA", "NANJUNDAPPA", "RAMAIAH", "SIDDAPPA", "VENKATARAMANA", "BASAVARAJ"]},
+    "telugu": {"men": ["SRINIVAS", "VENKATESH", "NAVEEN", "MAHESH", "KIRAN", "RAVI TEJA", "SURESH"],
+               "women": ["PADMA", "SWATHI", "SRAVANI", "ANUSHA", "MADHAVI", "SIRISHA", "LAVANYA"],
+               "surnames": ["REDDY", "NAIDU", "CHOWDARY", "GOUD", "RAO", "VARMA"],
+               "elders": ["NARAYANA", "SUBBA RAO", "RAMA RAO", "VENKATA RAMANA", "SATYANARAYANA"]},
+    "tamil": {"men": ["KARTHIK", "SENTHIL", "SARAVANAN", "BALAJI", "VIGNESH", "MURUGAN", "DINESH", "PRABHU",
+                      "ASHOK KUMAR"],
+              "women": ["PRIYA", "KAVITHA", "REVATHI", "SARANYA", "DIVYA", "MEENA", "GAYATHRI", "NITHYA"],
+              "surnames": [""],
+              "elders": ["MUTHU", "RAMASAMY", "PERUMAL", "SUBRAMANI", "GOVINDAN", "KANNAN", "PALANISAMY"]},
+    "kerala": {"men": ["ANIL", "SAJEEV", "BIJU", "SHAJI", "RAJEEV", "SUNIL", "PRADEEP"],
+               "women": ["ANJU", "BINDU", "RESHMA", "LEKHA", "SREEJA", "DIVYA"],
+               "surnames": ["NAIR", "MENON", "PILLAI", "KURIAN", "VARGHESE", "THOMAS"],
+               "elders": ["GOPINATHAN", "RAMACHANDRAN", "BALAKRISHNAN", "JOSEPH", "MATHEW"]},
+    "bengal": {"men": ["SOURAV", "ARINDAM", "DEBASISH", "PARTHA", "SANJIB", "ABHIJIT", "SUBRATA"],
+               "women": ["MOUMITA", "SUTAPA", "ANANYA", "RINA", "PAPIYA", "SWAGATA"],
+               "surnames": ["BANERJEE", "CHATTERJEE", "MUKHERJEE", "GHOSH", "BOSE", "DUTTA", "SEN"],
+               "elders": ["SUBHASH", "DILIP", "PRADIP", "TAPAN", "ASHIM"]},
+}
+FIRM_PREFIXES = {"west": ["Shree Samarth", "Mangalmurti", "Shree Ganesh", "Jai Malhar", "Siddhivinayak"],
+                 "gujarat": ["Shreeji", "Jalaram", "Umiya", "Swastik", "Parshwa"],
+                 "north": ["Shree Balaji", "Shiv Shakti", "Bajrang", "Shree Shyam", "Radhe Krishna"],
+                 "punjab": ["Guru Kirpa", "Sat Kartar", "Khalsa", "Mehar", "Waheguru"],
+                 "karnataka": ["Sri Venkateswara", "Sri Lakshmi", "Annapoorna", "Sri Sai Ram", "Sri Manjunatha"],
+                 "telugu": ["Sri Venkateswara", "Sri Lakshmi", "Annapoorna", "Sri Sai Ram", "Sri Durga"],
+                 "tamil": ["Sri Murugan", "Sri Lakshmi", "Annapoorna", "Sri Sai Ram", "Sri Balaji"],
+                 "kerala": ["Sree Krishna", "Sree Bhadra", "Malabar", "Kairali", "Sree Lakshmi"],
+                 "bengal": ["Maa Tara", "Joy Guru", "Loknath", "Ma Durga", "Annapurna"]}
+TRADES = ["Traders", "Enterprises", "Hardware", "Electricals", "Medical Stores", "Agencies", "Textiles", "Auto Parts",
+          "Furniture", "Packaging", "Plastics", "Engineering Works", "Opticals", "Sweets", "Caterers", "Printers",
+          "Tyres", "Paints", "Sanitary Stores", "Steel Traders"]
+INDUSTRIES = {"Polymers": "22209", "Infratech": "45200", "Foods": "15400", "Packaging": "17029", "Pharma": "21002",
+              "Logistics": "63090", "Textiles": "17111", "Agro Industries": "01403", "Engineering": "29299"}
+BUILDING_PREFIXES = ["Sai Krupa", "Om Shanti", "Gokul", "Siddhi", "Sunrise", "Green Valley", "Silver Oak", "Lotus",
+                     "Orchid", "Anand", "Vrindavan", "Pushpak", "Nandanvan", "Ashirwad", "Sukh Shanti", "Navratna",
+                     "Sapphire", "Emerald", "Mangal", "Shubham"]
+FLAT_SUFFIXES = ["Apartments", "Residency", "Heights", "Towers", "Enclave", "Homes"]
+HOUSE_SUFFIXES = ["Enclave", "Gardens", "Vihar", "Homes", "Avenue"]
+SHOP_SUFFIXES = ["Plaza", "Arcade", "Business Centre", "Trade Centre", "Chambers", "Complex", "Shopping Centre"]
+LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def mon_date(d):
+    """DD-MON-YY, as the LMS writes most dates."""
+    return f"{d.day:02d}-{MONTHS[d.month - 1]}-{d.year % 100:02d}"
+
+
+def ordinal(n):
+    if n == 0:
+        return "Ground"
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def title(name):
+    return " ".join(word.capitalize() for word in name.split())
+
+
+def similar(a, b):
+    """Given names too alike for two members of one family (the tool would
+    take them for spellings of one name)."""
+    return a[:3] == b[:3] or difflib.SequenceMatcher(None, a, b).ratio() >= 0.6
+
+
+class Family:
+    """The members of one family, named the way their region writes names."""
+
+    def __init__(self, rng, style):
+        self.rng, self.style, self.pool = rng, style, NAMES[style]
+        self.surname = rng.choice(self.pool["surnames"])
+        self.initial = rng.choice("BCGKMNPRSV")                     # a Telugu family-name initial
+        self.initial_first = rng.random() < 0.5                    # Tamil: "S KARTHIK" or "KARTHIK S"
+        self.surname_first = style == "gujarat" and rng.random() < 0.4   # CKYC "PATEL KETAN RAMESHBHAI"
+        self.given_names = []
+
+    def pick(self, gender, elder=False):
+        names = self.pool["elders"] if elder else self.pool["men" if gender == "M" else "women"]
+        free = [n for n in names if not any(similar(n, used) for used in self.given_names)] \
+            or [n for n in names if n not in self.given_names] or names
+        name = self.rng.choice(free)
+        self.given_names.append(name)
+        return name
+
+    def member(self, role, gender, birth_year, given=None, father="", husband=""):
+        """father / husband: the given name the member's own name carries after theirs."""
+        return {"role": role, "gender": gender, "given": given or self.pick(gender), "father": father,
+                "husband": husband, "birth_year": birth_year,
+                "kumar": self.style == "north" and gender == "M" and self.rng.random() < 0.25}
+
+    def full_name(self, p):
+        """The name given name first, the way the family writes it."""
+        s, g, link, man = self.surname, p["given"], p["husband"] or p["father"], p["gender"] == "M"
+        if self.style == "west":                                    # RAHUL VIJAY PATIL, PRIYA RAHUL PATIL
+            return f"{g} {link} {s}"
+        if self.style == "gujarat":                                 # KETAN RAMESHBHAI PATEL
+            return f"{g} {link}BHAI {s}"
+        if self.style == "north":
+            return f"{g} KUMAR {s}" if p["kumar"] else f"{g} {s}"
+        if self.style == "punjab":
+            return f"{g} {'SINGH' if man else 'KAUR'} {s}"
+        if self.style == "karnataka":                               # MANJUNATH GOWDA or MANJUNATH K
+            return f"{g} {s}" if s else f"{g} {link[0]}"
+        if self.style == "telugu":                                  # K SRINIVAS REDDY, K PADMA
+            return f"{self.initial} {g} {s}" if man else f"{self.initial} {g}"
+        if self.style == "tamil":                                   # S KARTHIK or KARTHIK S
+            return f"{link[0]} {g}" if self.initial_first else f"{g} {link[0]}"
+        if self.style == "kerala":                                  # ANIL NAIR, BINDU ANIL
+            return f"{g} {s}" if man else f"{g} {link}"
+        return f"{g} {s}"                                           # bengal
+
+    def ckyc_name(self, p):
+        name = self.full_name(p)
+        return f"{self.surname} {name.rsplit(' ', 1)[0]}" if self.surname_first else name
+
+    def owner_cell(self, p):
+        """How COLLATERAL's Owner Name writes the member: in capitals, or with a title."""
+        name, form = self.full_name(p), self.rng.random()
+        if form < 0.4:
+            return name
+        if form < 0.85:
+            mr, mrs = ("Shri", "Smt.") if self.style == "north" else ("Mr.", "Mrs.")
+            return f"{mr if p['gender'] == 'M' else mrs} {title(name)}"
+        return title(name)
+
+    def report_name(self, p):
+        """How a title report writes the member: a title, and in the west the
+        middle name as an initial ("Mr. Rahul V. Patil")."""
+        words = title(self.full_name(p)).split()
+        if self.style in ("west", "gujarat") and len(words) == 3:
+            words[1] = words[1][0] + "."
+        words = [w + "." if len(w) == 1 else w for w in words]
+        honorific = "Mr." if p["gender"] == "M" else "Mrs." if p["husband"] else "Ms."
+        return f"{honorific} {' '.join(words)}"
+
+    def short_name(self, p):
+        """The loan applicant as a title report names it ("Rahul Patil")."""
+        words = title(self.full_name(p)).split()
+        return f"{words[0]} {words[-1]}" if self.style in ("west", "gujarat") else " ".join(words)
+
+
+def new_pan(rng, holder, initial, used):
+    """A made-up PAN: 4th letter P (person), F (firm) or C (company), 5th the
+    first letter of the surname or name."""
+    while True:
+        pan = "".join(rng.choice(LETTERS) for _ in range(3)) + holder + initial + f"{rng.randrange(1, 10000):04d}" \
+            + rng.choice(LETTERS)
+        if pan not in used["pans"]:
+            used["pans"].add(pan)
+            return pan
+
+
+def building(rng, suffixes, used):
+    while True:
+        name = f"{rng.choice(BUILDING_PREFIXES)} {rng.choice(suffixes)}"
+        if name not in used["buildings"]:
+            used["buildings"].add(name)
+            return name
+
+
+def land_number(rng, label):
+    if label == "Plot No.":
+        return str(rng.randint(1, 160))
+    if label == "CTS No.":
+        return f"{rng.randint(100, 1999)}{rng.choice(['', '/A', '/B', '/1'])}"
+    return f"{rng.randint(10, 450)}/{rng.randint(1, 9)}{rng.choice(['', '', 'A', 'B'])}"
+
+
+def premises(rng, place, kind, used):
+    """A flat, house, office or shop in this place: the parts of its address,
+    its areas (LMS square feet), its address as the property's (sometimes with
+    the land number) and as a customer's postal address."""
+    floor = 0 if kind == "shop" else rng.randint(1, 12) if kind in ("flat", "office") else None
+    if kind == "house":
+        unit, name = str(rng.randint(1, 250)), building(rng, HOUSE_SUFFIXES, used)
+        built = rng.randint(110, 320) * 10
+        carpet = round(built * 0.85)
+    else:
+        unit = str(rng.randint(1, 40)) if kind == "shop" else f"{floor}{rng.randint(1, 8):02d}"
+        name = building(rng, FLAT_SUFFIXES if kind == "flat" else SHOP_SUFFIXES, used)
+        carpet = rng.randint(*{"flat": (45, 160), "office": (25, 90), "shop": (15, 60)}[kind]) * 10
+        built = round(carpet * 1.2)
+    word = {"flat": "Flat", "house": "House", "office": "Office", "shop": "Shop"}[kind]
+    head = f"{word} No. {unit}" + (f", {ordinal(floor)} Floor" if floor is not None else "")
+    wing = rng.choice(["A Wing, ", "B Wing, "]) if kind == "flat" and rng.random() < 0.3 else ""
+    land = land_number(rng, place["label"])
+    street = rng.choice(place["streets"])
+    tail = f"{street}, {place['locality']}, {place['city']}, {place['state']}- {place['pin']}, India"
+    with_land = place["label"] == "Plot No." or rng.random() < 0.4      # many LMS addresses leave it out
+    return {"kind": kind, "unit": unit, "floor": floor, "name": name, "land": land, "built": built,
+            "carpet": carpet, "address": f"{head}, {wing}{name}, " + (f"{place['label']} {land}, " if with_land else "")
+            + tail, "postal": f"{head}, {wing}{name}, {tail}"}
+
+
+def report_description(template, prop, place):
+    """Title report item 1 for these premises, worded like the real reports."""
+    word = {"flat": "Flat", "house": "House", "office": "Office", "shop": "Shop"}[prop["kind"]]
+    land = f"{place['label']} {prop['land']}"
+    where = f"{place['locality']}, {place['city']}, District {place['district']}"
+    pin = f"{place['state']} {place['pin'][:3]} {place['pin'][3:]}"
+    if prop["kind"] == "house":
+        area = f"{prop['built'] * 0.092903:.2f}"
+        if template == "A":
+            return (f"{word} No. {prop['unit']}, adm. {area} Sq. Mtrs., Built up area, consisting of ground and first "
+                    f"floors, in the layout known as ‘{prop['name']}’, constructed on land bearing {land}, situated "
+                    f"at {where}, {pin}.")
+        return (f"{word} No. {prop['unit']} admeasuring {area} sq.mtr built up area consisting of ground and first "
+                f"floors in the layout known as {prop['name']} constructed on the land bearing {land} situated at "
+                f"{where}")
+    area = f"{prop['carpet'] * 0.092903:.2f}"
+    floor = ordinal(prop["floor"])
+    if template == "A":
+        return (f"{word} No. {prop['unit']} on the {floor} Floor, adm. {area} Sq. Mtrs., Carpet area, in the "
+                f"building known as ‘{prop['name']}’ constructed on land bearing {land}, situated at {where}, {pin}.")
+    return (f"{word} No. {prop['unit']} admeasuring {area} sq.mtr carpet area on the {floor} floor in the building "
+            f"known as {prop['name']} of the project known as {prop['name']} constructed on the land bearing {land} "
+            f"situated at {where}")
+
+
+def regular_applications(apps, target):
+    """Generated regular applications that bring the CKYC extract to `target` rows."""
+    rows = len(ckyc_rows(apps))
+    if rows > target:
+        raise SystemExit(f"The hand-made cases already have {rows} CKYC rows: CKYC_ROWS ({target}) cannot be lower.")
+    rng = random.Random(SEED)
+    used = {"pans": {n for a in apps for c in a["customers"] for t, n in c["ids"] if t == "PAN"}
+            | {c["pan"] for a in apps for c in a["customers"] if c["pan"]}, "buildings": set()}
+    number = max(int(a["app"][4:]) for a in apps) - 90000 + 1
+    coll = max(int(c["coll"][4:]) for a in apps for c in a["collaterals"]) - 90000 + 1
+    made = []
+    while rows < target:
+        app = regular_application(rng, number, coll, target - rows, used)
+        made.append(app)
+        rows += len(ckyc_rows([app]))
+        number += 1
+        coll += len(app["collaterals"])
+    return made
+
+
+def regular_application(rng, number, coll, room, used):
+    """One generated application with at most `room` CKYC rows."""
+    place = dict(zip(("branch", "locality", "city", "state", "pin", "district", "label", "streets", "leasehold"),
+                     rng.choice(PLACES)))
+    gst_code, udyam_code, cin_code = STATE_CODES[place["state"]]
+    style = NAMING[place["state"]]
+    kind = rng.choices(["individual", "proprietorship", "partnership", "company"], [45, 35, 10, 10])[0]
+    if room < 3:
+        kind = "individual"            # a business comes with its proprietor, partner or director: 3+ rows
+    size = rng.choices([2, 3, 4, 5, 6], [17, 40, 27, 13, 3])[0]       # customers, as in the real CKYC
+    disbursal = date(2026, 6, 1) + timedelta(days=rng.randrange(115))
+    fam = Family(rng, style)
+
+    # the family: the head, the wife, then other relatives in a random order
+    head_age = rng.randint(30, 60)
+    head_year = 2026 - head_age
+    grandfather = fam.pick("M", elder=True)
+    head_man = rng.random() < 0.8
+    head = fam.member("head", "M" if head_man else "F", head_year, father=grandfather)
+    wife = fam.member("wife", "F", head_year + rng.randint(0, 6), husband=head["given"]) \
+        if head_man and rng.random() < 0.85 else None
+    others = [fam.member("brother", "M", head_year + rng.choice([-5, -3, 2, 4]), father=grandfather)]
+    if head_age <= 50:
+        father = fam.member("father", "M", head_year - rng.randint(24, 32), given=grandfather,
+                            father=fam.pick("M", elder=True))
+        others += [father, fam.member("mother", "F", father["birth_year"] + rng.randint(2, 6), husband=grandfather)]
+    if head_age >= 48:
+        gender = rng.choice("MF")
+        others.append(fam.member("son" if gender == "M" else "daughter", gender,
+                                 min(head_year + rng.randint(24, 30), 2004),
+                                 father=head["given"] if head_man else fam.pick("M")))
+    brother = others[0]
+    rng.shuffle(others)
+
+    home = premises(rng, place, "house" if style in ("karnataka", "telugu", "tamil", "north", "punjab")
+                    and rng.random() < 0.3 else "flat", used)
+    office = premises(rng, place, rng.choice(["office", "shop"]), used) if kind != "individual" else None
+
+    # the customers, the primary first: (customer, family member, essential)
+    entries = []
+    numbers = iter(range((9000 + number) * 10 + 1, (9000 + number) * 10 + 10))     # their Neo CIF numbers
+
+    def add_person(p, ctype, essential, address, family=fam):
+        words = family.full_name(p).split()
+        if "pan" not in p:                             # a proprietor already has the firm's PAN
+            p["pan"] = new_pan(rng, "P", words[-1][0], used)
+        ids = [("PAN", p["pan"])]
+        if rng.random() < 0.03:                        # a second ID document: a second CKYC row
+            ids.append(rng.choice([("Voter's ID", "".join(rng.choice(LETTERS) for _ in range(3))
+                                    + f"{rng.randrange(10 ** 7):07d}"),
+                                   ("PASSPORT", f"{rng.choice(LETTERS)}{rng.randrange(10 ** 7):07d}")]))
+        dob = date(p["birth_year"], rng.randint(1, 12), rng.randint(1, 28))
+        email = (f"{p['given'].split()[0].lower()}.{words[-1].lower()}{dob.year % 100:02d}@example.com"
+                 if rng.random() < 0.35 and len(words[-1]) > 1 else None)
+        risk = rng.choices(["Low Risk", "Medium Risk", "High Risk"], [83, 15, 2])[0]
+        entries.append((person(next(numbers), family.ckyc_name(p), ctype, mon_date(dob), p["pan"], ids=ids,
+                               email=email, addresses=[("ResidentialAddress", address)], risk=risk), p, essential))
+
+    business, role, second = None, "", None
+    if kind == "individual":
+        add_person(head, "primary", True, home["postal"])
+    else:
+        prefix = rng.choice(FIRM_PREFIXES[style])
+        if kind == "company":
+            industry = rng.choice(list(INDUSTRIES))
+            name = f"{prefix} {industry} {rng.choice(['Private Limited', 'Pvt. Ltd.', 'Pvt Ltd'])}"
+            constitution, role = "Private Limited Company", "director"
+            inc = date(rng.randint(2004, 2021), rng.randint(1, 12), rng.randint(1, 28))
+            pan = new_pan(rng, "C", name[0], used)
+            ids = [("PAN", pan), ("CIN No", f"U{INDUSTRIES[industry]}{cin_code}{inc.year}PTC"
+                                            f"{rng.randrange(1, 10 ** 6):06d}")]
+        else:
+            name = f"{prefix} {rng.choice(TRADES)}"
+            constitution = "Sole Proprietorship Firm" if kind == "proprietorship" else "Partnership Firm"
+            role = "proprietor" if kind == "proprietorship" else "partner"
+            inc = date(rng.randint(2004, 2022), rng.randint(1, 12), rng.randint(1, 28))
+            if kind == "proprietorship":               # a proprietorship uses its proprietor's PAN
+                head["pan"] = pan = new_pan(rng, "P", fam.full_name(head).split()[-1][0], used)
+            else:
+                pan = new_pan(rng, "F", name[0], used)
+            ids = [("PAN", pan)]
+        if rng.random() < 0.6:
+            ids.append(("UDHYAM_REGISTRATION", f"UDYAM-{udyam_code}-{rng.randint(1, 35):02d}-"
+                                               f"{rng.randrange(10 ** 7):07d}"))
+        if rng.random() < 0.4:
+            ids.append(("GST_NO", f"{gst_code}{pan}1Z{rng.choice(LETTERS + '0123456789')}"))
+        name = name.upper() if rng.random() < 0.6 else name
+        email = f"{''.join(ch for ch in name.lower() if ch.isalpha())[:18]}@example.com" if rng.random() < 0.5 else None
+        business = firm(next(numbers), name, constitution, "primary", mon_date(inc), pan, ids=ids, email=email,
+                        addresses=[("OfficeAddress", office["postal"])],
+                        risk=rng.choices(["Low Risk", "Medium Risk"], [85, 15])[0])
+        entries.append((business, None, True))
+        add_person(head, "Co-Applicant", True, home["postal"])
+        if kind in ("partnership", "company"):         # a second partner or director
+            if kind == "company" and wife is not None:
+                second, wife = wife, None
+            else:
+                second = brother
+                others.remove(brother)
+            add_person(second, "Co-Applicant", False, home["postal"])
+    if wife is not None and len(entries) < size:
+        add_person(wife, "Co-Applicant", False, home["postal"])
+    for other in others:
+        if len(entries) >= size:
+            break
+        add_person(other, "Co-Applicant", False, home["postal"])
+    if rng.random() < 0.06:                            # a friend who stands guarantee: not a borrower
+        friend = Family(rng, style)
+        add_person(friend.member("guarantor", "M", 2026 - rng.randint(35, 60), father=friend.pick("M", elder=True)),
+                   "Guarantor", False, premises(rng, place, "flat", used)["postal"], friend)
+
+    # trim to the room left in the CKYC extract: optional customers first (from
+    # the end), then extra ID documents
+    def rows_of():
+        return sum(max(1, len(c["ids"])) * max(1, len(c["ckyc_addresses"])) for c, _, _ in entries)
+
+    while rows_of() > room and any(not essential for _, _, essential in entries):
+        entries.pop(max(i for i, (_, _, essential) in enumerate(entries) if not essential))
+    for customer, _, _ in reversed(entries):
+        while rows_of() > room and len(customer["ids"]) > 1:
+            customer["ids"].pop()
+    customers = [c for c, _, _ in entries]
+    family = [p for _, p, _ in entries if p is not None and p["role"] != "guarantor"]
+    wife = next((p for p in family if p["role"] == "wife"), None)
+    second = second if second in family else None
+    guarantor = any(p is not None and p["role"] == "guarantor" for _, p, _ in entries)
+
+    # the collaterals: the home and/or the business premises, owned by borrowers
+    def owners_of(prop):
+        if prop["kind"] in ("office", "shop") and kind == "company":
+            return [business]
+        if prop["kind"] in ("office", "shop") and kind == "partnership":
+            return [business] if second is None or rng.random() < 0.4 else [head, second]
+        if prop["kind"] in ("flat", "house") and wife is not None and rng.random() < 0.45:
+            return [head, wife]
+        return [head]
+
+    props = [home] if kind == "individual" or rng.random() < 0.5 else [office]
+    if rng.random() < 0.1:                             # a second collateral
+        props.append(premises(rng, place, "flat", used) if office is None else office if props[0] is home else home)
+    applicant = fam.short_name(head) if business is None else \
+        f"{title(business['name'])} (through its {role} {fam.short_name(head)})"
+    collaterals, notes = [], []
+    for k, prop in enumerate(props):
+        owners = owners_of(prop)
+        cells = [title(o["name"]) if o is business else fam.owner_cell(o) for o in owners]
+        on_report = [f"M/s. {title(o['name'])}" if o is business else fam.report_name(o) for o in owners]
+        commercial = prop["kind"] in ("office", "shop")
+        if prop is not home and not commercial:
+            purpose = "Rented"                         # a second flat, let out
+        else:
+            purpose = rng.choice(["Self Occupied", "Self Occupied", "Rented"]) if commercial else "Self Occupied"
+        template = rng.choice("AB")
+        initiated = disbursal - timedelta(days=rng.randint(15, 40))
+        number_id = 90000 + coll + k
+        collaterals.append(collateral(
+            f"COLL{number_id:08d}", f"CMS{number_id:08d}", "COMMERCIAL" if commercial else "RESIDENTIAL",
+            prop["address"], place["pin"], list(zip(cells, {1: [100], 2: [50, 50]}[len(owners)])),
+            built=prop["built"], carpet=prop["carpet"],
+            nature="LEASEHOLD" if place["leasehold"] or rng.random() < 0.05 else "FREEHOLD", purpose=purpose,
+            age=rng.randint(1, 25),
+            pdf=report(template, applicant, (" & " if template == "A" else " and ").join(on_report),
+                       report_description(template, prop, place),
+                       nature="Commercial" if commercial else "Residential.",
+                       mortgage="Registered Mortgage" if place["state"] == "Telangana" and rng.random() < 0.5
+                       else "Equitable Mortgage",
+                       initiated=initiated.strftime("%d/%m/%Y"),
+                       issued=(initiated + timedelta(days=rng.randint(2, 6))).strftime("%d/%m/%Y"))))
+        owned = " and ".join(title(o["name"]) if o is business else title(fam.full_name(o)) for o in owners)
+        notes.append(f"{prop['kind']} owned by {owned}" + (" (50% each)" if len(owners) == 2 else ""))
+
+    who = {"individual": "an individual", "proprietorship": "a sole proprietorship firm with its proprietor",
+           "partnership": "a partnership firm with its partner" + ("s" if second else ""),
+           "company": "a private limited company with its director" + ("s" if second else "")}[kind]
+    relatives = len(family) - 1 - (1 if second else 0)
+    if relatives:
+        who += f" and {relatives} family member{'s' if relatives > 1 else ''}"
+    if guarantor:
+        who += ", and a guarantor"
+    sanctioned = round(math.exp(rng.uniform(math.log(1_500_000), math.log(20_000_000))) / 50_000) * 50_000
+    return application(
+        f"APPL{90000 + number:08d}", place["branch"], disbursal.strftime("%d-%m-%Y"), customers, collaterals,
+        [loan(900000 + number * 100 + 1, "A", mon_date(disbursal), sanctioned)],
+        received=mon_date(disbursal - timedelta(days=rng.randint(20, 60))),
+        product=rng.choices([5000980, 5001360, 5001380], [90, 5, 5])[0],
+        case=f"Regular record (generated): {who} in {place['locality']}, {place['city']}; " + "; ".join(notes)
+             + ("; the title reports agree" if len(props) > 1 else "; the title report agrees") + " with the LMS.")
 
 
 # --------------------------------------------------------------------------
@@ -915,7 +1596,8 @@ def collateral_rows(apps):
         for l in a["loans"]:
             for col in a["collaterals"]:
                 owners = col["owners"] or [(None, None)]
-                status = None if not col["owners"] else ("Single" if len(col["owners"]) == 1 else "Joint")
+                status = col["status"] or (None if not col["owners"] else
+                                           "Single" if len(col["owners"]) == 1 else "Joint")
                 for c in a["customers"]:
                     for owner, share in owners:
                         for address_type, address in (c["addresses"] or [(None, None)]):
@@ -1180,6 +1862,8 @@ def write_report_body(w, spec):
 # --------------------------------------------------------------------------
 def main():
     apps = build_applications()
+    apps += regular_applications(apps, CKYC_ROWS)
+    assert len(ckyc_rows(apps)) == CKYC_ROWS, len(ckyc_rows(apps))
     for folder in (CKYC_DIR, COLL_DIR, LEGAL_DIR):
         folder.mkdir(parents=True, exist_ok=True)
         for old in folder.iterdir():
@@ -1209,8 +1893,13 @@ def main():
              "made up; PIN codes and place names are real. Run the tool on this data with `--dummy`.", "",
              "As in the LMS, an application can have several collaterals (one loan secured by several properties), "
              "but a Collateral ID belongs to one application only. Borrowers are per application; owners are per "
-             "collateral and can be the same, different, or overlap between the collaterals of one application.", "",
-             "| Application | Collateral(s) | What it tests |", "|---|---|---|"]
+             "collateral and can be the same, different, or overlap between the collaterals of one application.", ""]
+    generated = [a for a in apps if a["case"].startswith("Regular record")]
+    if generated:
+        lines += [f"Applications {generated[0]['app']} to {generated[-1]['app']} are ordinary records, generated so that "
+                  f"CKYC has exactly {CKYC_ROWS} rows (`CKYC_ROWS` in the script). Each one has its COLLATERAL rows and a "
+                  "title report for every collateral that agrees with the LMS.", ""]
+    lines += ["| Application | Collateral(s) | What it tests |", "|---|---|---|"]
     for a in apps:
         colls = ", ".join(c["coll"] for c in a["collaterals"])
         lines.append(f"| {a['app']} | {colls} | {a['case']} |")

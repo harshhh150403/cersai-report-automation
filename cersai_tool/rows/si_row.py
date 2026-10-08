@@ -49,23 +49,33 @@ def col_03_number_of_borrowers(c, row):
 
 # Column 4 - NUMBER_OF_ASSET_OWNERS
 # Where it comes from: the property owners, compared with the borrowers.
-#   Owners are the one value always checked against the title report:
-#   - COLLATERAL "Owner Name" and the title report's item 4 agree -> verified;
-#   - COLLATERAL has no owners -> the title report's owners are used;
-#   - they differ -> the title report's owners are used (it is the legal
-#     record) and the collateral is flagged for review; if the PDF may be the
-#     wrong one (right-PDF check), the SI is held instead;
-#   - no usable title report -> COLLATERAL's owners, marked "not verified".
-# Rules: each owner is matched to a borrower by name (titles like Mr/Mrs/Smt
-#   and spelling differences are ignored; initials match whole names). This
-#   column counts the owners who are NOT borrowers. 0 when every owner is a
-#   borrower. A name that only probably matches a borrower (a spelling
-#   difference) is counted as that borrower, but the SI is held until someone
-#   confirms it (Y/N in the Check and correct sheet). Names that differ in a
-#   given name are different people, even when the surname and the father's or
-#   husband's name are the same (relatives).
-# If it can't be found: no owners in either source -> reported as missing;
-#   owner names can be typed in the required-details file.
+#   The owners come from COLLATERAL "Owner Name" (each person once). Their
+#   "Percentage Share" should add up to 100% and "Ownership Status" should be
+#   Single for one owner and Joint for more: if not, the collateral is listed
+#   in the Check and correct sheet. A name cell holding two people ("KALAISELVI
+#   AND RADHAKRISHNAN SANKARANARAYANAN") is taken as two owners when each is a
+#   borrower, and is otherwise listed there too (company names contain "and").
+#   The title report (item 4) is the main source only when COLLATERAL has no
+#   owners. Otherwise it checks them: when it names other owners, both lists
+#   are shown in the Check and correct sheet and the COLLATERAL owners are used.
+#   Only when the COLLATERAL shares show an owner is missing (they add up to
+#   less than 100%, or Joint with one owner) and the title report names every
+#   COLLATERAL owner plus others, those others are added.
+# Rules: each owner is matched to a borrower by name (titles like Mr/Mrs/Smt,
+#   a father's or husband's name after S/O, D/O or W/O, and spelling
+#   differences are ignored; initials match whole names). This
+#   column counts the owners who are NOT borrowers; 0 when every owner is a
+#   borrower. Each borrower is linked to one owner of the property at most
+#   (owners listed separately are different people). Similar names (a spelling
+#   difference, a missing surname) are taken to be the same person; names whose
+#   given names differ are taken to be different people, even when the surname
+#   and the father's or husband's name are the same ("DEEPA RAVIRAJ HIREMATH",
+#   a wife, is not "RAVIRAJ HIREMATH"). These uncertain decisions are listed in
+#   the Check and correct sheet, where a Y or N changes them.
+#   With several collaterals on one application, all this is worked out for
+#   each collateral with its own owners.
+# If it can't be found: no owners in COLLATERAL or a usable title report ->
+#   reported as missing; owner names can be typed in the required-details file.
 def col_04_number_of_asset_owners(c, row):
     typed = c.ov("NUMBER_OF_ASSET_OWNERS")
     if typed is not None:
@@ -75,10 +85,15 @@ def col_04_number_of_asset_owners(c, row):
         return missing("NUMBER_OF_ASSET_OWNERS", decision.note)
     count = len(c.non_borrower_owners())
     note = f"owners: {'; '.join(decision.owners)} ({decision.note})"
-    probable = [link for link in c.owner_links if link.probable]
-    if probable:
-        note += "; to confirm: " + "; ".join(f"'{l.owner}' = borrower '{l.borrower_name}'?" for l in probable)
-    if decision.status in ("conflict", "held"):
+    uncertain = [link for link in c.owner_links if link.uncertain]
+    if uncertain:
+        note += "; decided on similar names: " + "; ".join(
+            f"'{l.owner}' = '{l.borrower_name}'" if l.neo_cif else f"'{l.owner}' is not '{l.near_name}'"
+            for l in uncertain)
+    for problem in (decision.count_problem, decision.split_note):
+        if problem:
+            note += f"; {problem}"
+    if decision.status == "differs":
         return conflict("NUMBER_OF_ASSET_OWNERS", count, decision.source,
                         "; ".join(decision.lms_owners), "; ".join(decision.pdf_owners), note)
     source = decision.source or SRC_LMS

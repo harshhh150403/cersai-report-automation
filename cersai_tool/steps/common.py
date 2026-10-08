@@ -22,7 +22,7 @@ class Block:
 
     @property
     def held(self) -> bool:
-        """Waiting for an answer in the required-details file (PDF_CHECK or OWNER_MATCH)."""
+        """Waiting for an answer in the required-details file (PDF_CHECK)."""
         return bool(self.context.hold_reasons)
 
     @property

@@ -76,9 +76,18 @@ type another batch name such as `2026-09-30`.
 4. Otherwise a default (SI type 17 Equitable Mortgage when there is no title report) or the value is
    asked for.
 
-Property owners are the exception: they are always checked against the title report. When the LMS and
-the title report disagree, the title report's owners are used and the difference is shown in Check and
-correct.
+Property owners come from COLLATERAL (`Owner Name`) too. Their `Percentage Share` should add up to 100%
+and `Ownership Status` should match the number of owners (Single = one, Joint = more). The title report
+checks them. When it names other owners, the COLLATERAL owners are still used and both lists are shown in
+Check and correct. The title report's owners are used only when COLLATERAL has no owners. The one gap it
+fills: when the COLLATERAL shares show an owner is missing (for example 50% in total) and the title report
+names the same owners plus others, those others are added.
+
+Each owner is then matched to a borrower by name. When the names are only similar, the tool decides on its
+own and lists the decision in Check and correct, where a `Y` or `N` changes it:
+- a spelling difference or a missing surname: taken to be the same person;
+- different given names (usually a relative, such as a wife whose name contains her husband's): taken to
+  be different people.
 
 ## Things the tool will tell you about
 
@@ -86,8 +95,12 @@ correct.
 |---|---|
 | The title report may belong to another property (applicant, owners and flat number do not match) | The SI is **held**. Answer `PDF OK` or `WRONG PDF` in Check and correct, then run step 2 again. A held report's values are not used. |
 | An owner is not a borrower (third-party mortgage) | The SI is left out of the `.DAT` file: CERSAI needs asset-owner rows, which the tool does not write yet. File it by hand, or correct the owners if they are in fact borrowers. |
-| An owner's name only probably matches a borrower (a spelling difference) | The SI is held until someone answers Y or N in Check and correct. One answer covers every collateral of the application with that owner. Names that differ in a given name (relatives sharing a surname) are treated as different people. |
+| An owner's name only resembles a borrower's (a spelling difference, or different given names) | The tool decides and lists the decision in Check and correct; nothing is held. Type `N` or `Y` there only if it is wrong. One answer covers every collateral of the application with that owner. |
+| COLLATERAL and the title report name different owners | The COLLATERAL owners are used and both lists are shown in Check and correct. Type the owners there if the title report is right. |
+| The COLLATERAL owners' Percentage Shares do not add up to 100%, or Ownership Status does not match the number of owners | Shown in Check and correct. If the title report names the same owners plus others, those others are added. |
+| One COLLATERAL Owner Name holds two people ("A and B") | Taken as two owners when each is a borrower (company names with "and" stay whole); otherwise shown in Check and correct. |
 | Two collaterals of one application seem to have each other's title reports | Both SIs are held; rename the two files and run step 1 again, or answer `WRONG PDF`. |
+| Two collaterals of one application have the same address | A warning on both SIs: check that the same property is not recorded twice. |
 | The same property secures another active loan | TYPE_OF_CHARGE is shown as a default to confirm. |
 | A title report file is misnamed, misfiled or scanned (no text) | Listed in the Issues sheet; the file is not used. |
 | CERSAI rejects an SI you already filed | In `Output data/Filed register.xlsx`, change its Status from `Filed` to `Pending` (or delete its row). It will come back in the next batch. |
@@ -110,6 +123,9 @@ The charge-holder (CHG) row is fixed in `cersai_tool/rows/chg_row.py`.
 
 `Dummy input data/` has the same layout as `Input data/`, with made-up people and companies covering
 the kinds of data found in the real extracts and title reports (`Dummy data cases.md` lists them).
+After the hand-made cases come ordinary generated records, so that CKYC has 200 rows. Each one has its
+COLLATERAL rows and a title report. To change the size, edit `CKYC_ROWS` in
+`dev_tools/make_dummy_data.py` and recreate the data.
 Add `--dummy` to any step; results go to `Dummy output data/`:
 
 ```
