@@ -7,8 +7,9 @@ Sheets
   Read me            how to fill the file.
   Borrowers          one row per borrower (application + Neo CIF ID) with a
                      value to fill. A value typed here is used on every SI of
-                     that application. Gender and father's/mother's name are
-                     never in the sources, so most individuals are listed.
+                     that application. Father's/mother's name is never in
+                     the sources (gender is, when CKYC has its Gender
+                     column), so most individuals are listed.
   Collaterals        one row per collateral with a value to fill.
   Check and correct  what someone should look at: differences between the LMS
                      and the title report (both values side by side), title

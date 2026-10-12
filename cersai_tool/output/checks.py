@@ -14,6 +14,7 @@ earlier .DAT file.
 import re
 from dataclasses import dataclass, field
 
+from .. import settings
 from ..rows import bor_row, chg_row, imm_row, si_row
 from ..rules.dates import check_cersai_date
 from ..rules.identifiers import CIN_RE, CKYC_RE, EMAIL_RE, LLPIN_RE, MOBILE_RE, PAN_RE
@@ -172,7 +173,8 @@ BOR_RULES = {
     "ADDRESS_LINE_2": (False, _text(ADDRESS, 100)),
     "ADDRESS_LINE_3": (False, _text(ADDRESS, 100)),
     "CITY": (True, "code"), "DISTRICT": (True, "code"), "STATE": (True, "code"),
-    "PIN_CODE": (True, "code"), "COUNTRY": (True, "code"),
+    # the batch format description gives "IN" here, not a COUNTRY master code (the IMM row uses IND)
+    "PIN_CODE": (True, "code"), "COUNTRY": (True, _one_of(settings.BOR_CHG_COUNTRY)),
 }
 CHG_RULES = {
     "ROW_TYPE": (True, _one_of("CHG")),
@@ -182,7 +184,7 @@ CHG_RULES = {
     "ADDRESS_LINE_2": (False, _text(ADDRESS, 100)),
     "ADDRESS_LINE_3": (False, _text(ADDRESS, 100)),
     "CITY": (True, "code"), "DISTRICT": (True, "code"), "STATE": (True, "code"),
-    "PIN_CODE": (True, "code"), "COUNTRY": (True, "code"),
+    "PIN_CODE": (True, "code"), "COUNTRY": (True, _one_of(settings.BOR_CHG_COUNTRY)),
 }
 RULES = {"SI": (si_row.FIELDS, SI_RULES), "IMM": (imm_row.FIELDS, IMM_RULES), "BOR": (bor_row.FIELDS, BOR_RULES),
          "CHG": (chg_row.FIELDS, CHG_RULES)}

@@ -128,9 +128,10 @@ def col_22_pin_code(c, row):
 
 
 # Column 23 - COUNTRY
-# Always "IND" (the only India code in the CERSAI masters).
+# Always "IND": for the IMM row the batch format description says to use the
+# COUNTRY master, whose code for India is IND. (The BOR and CHG rows use "IN".)
 def col_23_country(c, row):
-    return fixed("COUNTRY", settings.COUNTRY)
+    return fixed("COUNTRY", settings.IMM_COUNTRY)
 
 
 # Columns 24-27 - LATITUDE_LONGITUDE_1 to 4

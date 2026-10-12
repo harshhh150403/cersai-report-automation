@@ -56,7 +56,10 @@ MAX_SI_PER_FILE = 1000           # CERSAI limit per .DAT file
 # --------------------------------------------------------------------------
 # Fixed and default values
 # --------------------------------------------------------------------------
-COUNTRY = "IND"                  # masters only have IND (Q4)
+IMM_COUNTRY = "IND"              # IMM row: the batch format description says "as per master", and the
+                                 # COUNTRY master's code for India is IND
+BOR_CHG_COUNTRY = "IN"           # BOR and CHG rows: the batch format description gives the value "IN"
+                                 # (a constant for CHG); these rows do not use the COUNTRY master
 FINANCING_TYPE_ID = "1"          # Sole
 CONSORTIUM_MEMBERS = "0"
 DEFAULT_SI_TYPE_ID = "17"        # Equitable Mortgage, used when no title report

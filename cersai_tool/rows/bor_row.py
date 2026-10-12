@@ -40,7 +40,8 @@ CONSTITUTION_CODES = {
     "society": "SOC", "association of persons": "AOP", "body of individuals": "BOI",
     "government body": "GOV", "foreign company": "FRC",
 }
-GENDER_WORDS = {"M": "M", "MALE": "M", "F": "F", "FEMALE": "F", "T": "T", "TRANSGENDER": "T"}
+GENDER_WORDS = {"M": "M", "MALE": "M", "F": "F", "FEMALE": "F", "T": "T", "TRANSGENDER": "T",
+                "THIRD GENDER": "T"}
 
 
 def is_individual(row, b) -> bool:
@@ -278,8 +279,10 @@ def col_13_individual_ckyc_number(c, b, serial, row):
 
 
 # Column 14 - GENDER (individuals only: M, F or T)
-# Not in CKYC or the title reports: always typed in the required-details file.
-# ("Male"/"Female" are accepted and turned into M/F.)
+# Where it comes from: CKYC "Gender" ("Male" -> M, "Female" -> F; M, F, T and
+#   "Transgender" are understood too).
+# If it can't be found: typed in the required-details file. (Older CKYC
+#   extracts have no Gender column; then every individual's gender is typed.)
 def col_14_gender(c, b, serial, row):
     if not is_individual(row, b):
         return not_applicable("GENDER", "only for individuals")
@@ -287,6 +290,12 @@ def col_14_gender(c, b, serial, row):
     if typed is not None:
         code = GENDER_WORDS.get(as_text(typed).upper())
         return manual("GENDER", code) if code else invalid("GENDER", typed, "must be M, F or T")
+    found = as_text(b.get("gender", ""))       # batches made before the Gender column have no "gender"
+    code = GENDER_WORDS.get(found.upper())
+    if code:
+        return ok("GENDER", code, SRC_LMS, f"CKYC Gender '{found}'")
+    if found:
+        return missing("GENDER", f"CKYC Gender '{found}' is not Male or Female: type M, F or T")
     return missing("GENDER", "not in CKYC: type M, F or T")
 
 

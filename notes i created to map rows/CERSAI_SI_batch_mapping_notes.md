@@ -369,7 +369,7 @@ The LMS source listed first is used whenever it gives a usable value. "Title rep
 | 20 | U | DISTRICT | M | PIN_CODE master, from `Property Pincode`. When the PIN maps to several districts, pick the one named in title report item 1 (`Taluka and District …`). | e.g. `10680` (MUMBAI SUBURBAN) | Must be in the PIN master |
 | 21 | V | STATE | M | DISTRICT master | e.g. `21` (Maharashtra) | Cross-check against the state name in the address |
 | 22 | W | PIN_CODE | M | COLLATERAL `Property Pincode`. Only if it is blank or not in the PIN master (8 active collaterals): the PIN in title report item 1, when there is one (1 of 4 demo files); else the required-details file. | 6 digits | Must be in the PIN_CODE master |
-| 23 | X | COUNTRY | M | Constant | `IND` (§11 Q4) | COUNTRY master |
+| 23 | X | COUNTRY | M | Constant | `IND`: "as per master" in the format description (§11 Q4) | COUNTRY master |
 | 24–27 | Y–AB | LATITUDE_LONGITUDE_1…4 | O | Not in source | Blank, but **the 4 empty positions must still be written** | |
 
 ### 7.4 BOR: borrower (`borrower` sheet)
@@ -391,7 +391,7 @@ Fields 7–11 apply only to **non-individual** borrower types (everything except
 | 11 | L | BORROWER_REGISTRATION_NUMBER | C | CKYC `CIN No` row, else the required-details file | **Required for COM and LLP**; blank for other types | CIN is 21 characters in a fixed pattern; LLPIN per spec (§11 Q16) |
 | 12 | M | INDIVIDUAL_PAN | C | CKYC PAN row | Individual only | PAN regex; 4th character `P` |
 | 13 | N | INDIVIDUAL_CKYC_NUMBER | C | **Required details** | Individual only; needed when there is no PAN (5 cases) | Exactly 14 digits |
-| 14 | O | GENDER | C | **Required details** (not in the extract) | `M`, `F` or `T` | GENDER master. **Don't guess from names.** |
+| 14 | O | GENDER | C | CKYC `Gender` (`Male` → `M`, `Female` → `F`); required details when blank or the column is missing | `M`, `F` or `T` | GENDER master. **Don't guess from names.** |
 | 15 | P | INDIVIDUAL_NAME | C | CKYC `Customer Name`, falling back to First + Middle + Last | Remove dots and digits (e.g. `SARVES .` → `SARVES`) | Letters and spaces only; ≤ 50 |
 | 16 | Q | FATHER_MOTHER_NAME | C | **Required details** (not in the extract) | Don't build it from the middle name (the demo did) | Letters and spaces only; ≤ 50 |
 | 17 | R | DATE_OF_BIRTH | C | CKYC `Date Of Birth` | `DD-MON-YY` → `YYYY-MM-DD` using the century rule (§8.2) | Not in the future, ≥ 1900 |
@@ -404,7 +404,7 @@ Fields 7–11 apply only to **non-individual** borrower types (everything except
 | 24 | Y | DISTRICT | M | PIN_CODE master | | |
 | 25 | Z | STATE | M | DISTRICT master | | |
 | 26 | AA | PIN_CODE | M | 6-digit PIN before `, India` in the address | | Must be in the PIN master |
-| 27 | AB | COUNTRY | M | Constant | `IND` (the spec text says `"IN"`; §11 Q4) | |
+| 27 | AB | COUNTRY | M | Constant | `IN`, as the format description gives it (§11 Q4) | |
 
 ### 7.5 CHG: charge holder (`charge_holder` sheet)
 
@@ -422,7 +422,7 @@ This is the same line for every SI. It comes from configuration, not from the da
 | 8 | I | DISTRICT | M | Config | `10680` (MUMBAI SUBURBAN) | |
 | 9 | J | STATE | M | Config | `21` (Maharashtra) | |
 | 10 | K | PIN_CODE | M | Config | `400063` | |
-| 11 | L | COUNTRY | M | Config | `IND` | |
+| 11 | L | COUNTRY | M | Constant | `IN`, a constant in the format description (§11 Q4) | |
 
 ---
 
@@ -594,7 +594,7 @@ Step 1 generates `Output data/<batch>/2 Required details_<batch>.xlsx` for each 
 
 | Sheet | One row per | Key | Input columns |
 |---|---|---|---|
-| **Borrowers** | borrower with a value to fill (most individuals, because gender and father's/mother's name are never in the sources) | Application number + Neo CIF ID | BORROWER_TYPE, PAN, CKYC, REG_NUMBER (CIN/LLPIN), REG_DATE, GENDER, FATHER_MOTHER_NAME, DATE_OF_BIRTH, ADDRESS, PIN_CODE, CITY, DISTRICT |
+| **Borrowers** | borrower with a value to fill (most individuals, because father's/mother's name is never in the sources; gender only when CKYC leaves it blank) | Application number + Neo CIF ID | BORROWER_TYPE, PAN, CKYC, REG_NUMBER (CIN/LLPIN), REG_DATE, GENDER, FATHER_MOTHER_NAME, DATE_OF_BIRTH, ADDRESS, PIN_CODE, CITY, DISTRICT |
 | **Collaterals** | collateral with a value to fill | Collateral ID | SI_TYPE_ID, SI_TYPE_OTHERS, TYPE_OF_CHARGE, ASSET_TYPE_ID, ASSET_TYPE_OTHERS, ASSET_SUB_TYPE_ID, ASSET_DESCRIPTION, SURVEY_NUMBER, PLOT_NUMBER, ASSET_AREA, ASSET_AREA_UNIT, HOUSE_NUMBER, FLOOR_NUMBER, BUILDING_NAME, PROJECT_NAME, STREET_NAME, LOCALITY, PIN_CODE, CITY, DISTRICT, OWNERS |
 | **Check and correct** | item to look at | Collateral ID (+ Neo CIF ID for a borrower) | Your value |
 | Lists (hidden) | — | — | the drop-down choices, from the masters |
@@ -670,7 +670,7 @@ The demo covers one SI: application `APPL00027326`, collateral `COLL00266688`, b
 | 32 | CHG | CITY (N13) | `62995` MALAD EAST | In district 355; PIN 400063 maps to 10680 | `81133` MALAD |
 | 33 | CHG | OFFICE_NAME (D13) | `ANANDRATHI GLOBAL FINANCE LIMITED` | Cosmetic: the master spells it "Anand Rathi" | `ANAND RATHI GLOBAL FINANCE LIMITED` |
 | 34 | All | Spacer rows and helper text | Blank rows 2/4/6…, `YYY-MM-DD` in F1/J2/R8/R10 | Must not end up in the `.DAT` | Write lines directly, without blanks |
-| 35 | All | COUNTRY | `IND` | Matches the COUNTRY master, but the spec text says `"IN"` for BOR and CHG | Keep `IND`; confirm (§11 Q4) |
+| 35 | BOR, CHG | COUNTRY | `IND` | The format description gives `"IN"` for BOR and CHG; only the IMM row uses the COUNTRY master (`IND`) | `IN` for BOR and CHG, `IND` for IMM (§11 Q4) |
 
 ### 10.2 Demo lines as they would be uploaded (from the cached formula results)
 
@@ -709,7 +709,7 @@ Each item has a recommended default so implementation can start; please confirm 
 | Q1 | Line ending | The demo puts a trailing `\|` on FH only; the spec is silent. | No trailing pipe; exactly (fields − 1) pipes. Confirm with a file CERSAI has accepted. |
 | Q2 | NUMBER_OF_RECORDS | Is it "records in the batch file" meaning SI blocks, or all lines? | Number of SI blocks (the demo uses 1 for 7 lines; the range 1–1000 fits SI blocks). |
 | Q3 | File name | The meaning of `NNNNN` and `012039` is not explained. | `NNNNN` = entity code `J8084`; `012039` kept literally. Confirm with the CERSAI user manual or a past upload. |
-| Q4 | Country | The spec text says `"IN"` for BOR and CHG, `"IND"` for movable assets and "as per master" for IMM. The COUNTRY and STATE masters only use `IND`. | `IND` everywhere. |
+| Q4 | Country | The spec text says `"IN"` for BOR and CHG, `"IND"` for movable assets and "as per master" for IMM. The COUNTRY and STATE masters only use `IND`. | **Resolved 2026-10-09:** follow the format description field by field: `IND` for IMM (as per the COUNTRY master), `IN` for BOR and CHG (`settings.IMM_COUNTRY`, `settings.BOR_CHG_COUNTRY`). |
 | Q5 | SI grain | One SI per collateral, or one SI per loan with several IMM lines? | One SI per (application, collateral), as in the demo. |
 | Q6 | SI creation date | The demo uses the disbursal date. The legal SI date is usually the mortgage deed / title-deed deposit date. The title reports don't give it either: they are written before disbursal, and none of their dates (initiation, issuance, deed dates) is the mortgage date. | CKYC `First Disbursal Date`, unless the LMS can supply the MODT date. |
 | Q7 | Secured amount | Sanctioned or disbursed (263 are partly disbursed)? If one loan has several properties, does each SI carry the full amount? | Sanctioned amount, the full amount on each SI. |

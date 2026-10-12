@@ -43,14 +43,18 @@ SURVEY_KEYS = (r"c\.?\s?t\.?\s?s\.?\s*(?:no\.?s?|nos\.?|number)?|survey\s*(?:no\
                r"|r\.?\s?s\.?\s*no\.?|(?<![A-Za-z]\.)c\.?\s?s\.?\s*no\.?"
                r"|gat\s*no\.?|gut\s*no\.?|khasra\s*(?:no\.?)?|kh\.?\s*no\.?|khata\s*no\.?|khewat\s*no\.?"
                r"|mustatil\s*no\.?|killa\s*no\.?|new\s*s\.?\s*no\.?")
+# A number continuing a list must be whole: not the start of "30th Cross Road"
+# ("Sy. No. 86/4B, 30th Cross Road" is one survey number, not 86/4B and 3).
 SURVEY_RE = re.compile(
-    rf"\b(?:{SURVEY_KEYS})\s*[:.\-]?\s*({_NUM_TOKEN}(?:\s*(?:,|&|and)\s*{_NUM_TOKEN}(?![A-Za-z]))*)", re.I)
+    rf"\b(?:{SURVEY_KEYS})\s*[:.\-]?\s*({_NUM_TOKEN}(?:\s*(?:,|&|and)\s*{_NUM_TOKEN}(?![A-Za-z0-9]))*)", re.I)
 HISSA_RE = re.compile(r"\bhissa\s*no\.?\s*([0-9A-Z/]+)", re.I)
 OLD_SURVEY_RE = re.compile(r"\bold\s*s(?:urvey)?\.?\s*no\.?\s*" + _NUM_TOKEN, re.I)
+# likewise for plots; and a highway ("Plot No. 114, NH 24 Service Road") is
+# not a second plot
 PLOT_RE = re.compile(
     rf"(?:\b(?:plot|p\.?\s?f|f\.?\s?p|final\s*plot|site)\s*(?:no\.?s?|nos\.?|number)?|(?<![A-Za-z]\.)\bp\.\s?no\.?)"
     rf"\s*[:.\-]?\s*"
-    rf"({_NUMBER}(?:\s*(?:,|&|and)\s*{_NUMBER}(?![A-Za-z]))*)", re.I)
+    rf"({_NUMBER}(?:\s*(?:,|&|and)\s*(?!(?:NH|SH)(?![A-Za-z])){_NUMBER}(?![A-Za-z0-9]))*)", re.I)
 
 PROJECT_WORDS = re.compile(
     r"\b(chsl?|csl|c\.h\.s|co-?op\.?|co-?operative|society|soc|apartments?|apts?|residency|residences?|heights|"

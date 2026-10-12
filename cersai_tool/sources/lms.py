@@ -25,6 +25,8 @@ CKYC_COLUMNS = ["First Disbursal Date", "Application Number", "Loan Account No",
                 "Applicant Type", "Customer Name", "CONSTITUTION", "Neo CIF ID", "Date Of Birth",
                 "Incorporation Date", "First Name", "Middle Name", "Last Name", "Identification Type",
                 "Identification Number", "Mobile No", "Email ID", "Full Address"]
+# read when the extract has them (older CKYC extracts have no Gender column)
+CKYC_OPTIONAL_COLUMNS = ["Gender"]
 COLLATERAL_COLUMNS = ["Application number", "Loan Account #", "Loan Status", "Disbursal Date",
                       "Customer Name", "Customer Type", "Neo CIF ID", "Collateral ID",
                       "Global collateral No", "Owner Name", "Property Type", "Full Address",
@@ -47,7 +49,9 @@ def find_single_xlsx(folder: Path) -> Path:
     return files[0]
 
 
-def read_export(path: Path, required: list) -> pd.DataFrame:
+def read_export(path: Path, required: list, optional=()) -> pd.DataFrame:
+    """The data sheet, every value as text. Optional columns are matched
+    whatever their case, and are empty when the file does not have them."""
     book = pd.ExcelFile(path)
     sheet = "Export Worksheet" if "Export Worksheet" in book.sheet_names else book.sheet_names[0]
     df = pd.read_excel(book, sheet_name=sheet, dtype=str)
@@ -55,6 +59,12 @@ def read_export(path: Path, required: list) -> pd.DataFrame:
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise InputError(f"{path.name} is missing columns: {', '.join(missing)}")
+    for name in optional:
+        found = next((c for c in df.columns if c.lower() == name.lower()), None)
+        if found is None:
+            df[name] = ""
+        elif found != name:
+            df = df.rename(columns={found: name})
     return df.map(as_text)
 
 
@@ -210,6 +220,7 @@ def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame) -> list:
             "middle_name": _first(rows["Middle Name"]),
             "last_name": _first(rows["Last Name"]),
             "date_of_birth": _first(rows["Date Of Birth"]),
+            "gender": _first(rows["Gender"]),
             "incorporation_date": _first(rows["Incorporation Date"]),
             "pan": ids.get("PAN", ""),
             "ckyc_number": ids.get("KYC IDENTIFICATION NUMBER", ""),
@@ -233,7 +244,7 @@ def load_bundles(paths):
     (known: every Collateral ID in COLLATERAL -> its application)."""
     ckyc_file = find_single_xlsx(paths.ckyc_folder)
     coll_file = find_single_xlsx(paths.collateral_folder)
-    ckyc = read_export(ckyc_file, CKYC_COLUMNS)
+    ckyc = read_export(ckyc_file, CKYC_COLUMNS, CKYC_OPTIONAL_COLUMNS)
     coll = read_export(coll_file, COLLATERAL_COLUMNS)
     bundles, notes, known = build_bundles(ckyc, coll)
     info = {"ckyc_file": str(ckyc_file), "ckyc_rows": len(ckyc),

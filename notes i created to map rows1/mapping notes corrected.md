@@ -277,7 +277,7 @@ Property values come from the input data first: COLLATERAL `Property Type`, `Pro
 - **Column 20 - DISTRICT** - value = District Code (e.g. `10680`)
 - **Column 21 - STATE** - value = State Code (e.g. `21`)
 - **Column 22 - PIN_CODE** - value = PIN code (6 digits)
-- **Column 23 - COUNTRY** - `IND` by default
+- **Column 23 - COUNTRY** - `IND`: the batch format description says "as per master" for this row, and the COUNTRY master's code for India is `IND`.
 - **Column 24 - LATITUDE_LONGITUDE_1** - blank
 - **Column 25 - LATITUDE_LONGITUDE_2** - blank
 - **Column 26 - LATITUDE_LONGITUDE_3** - blank
@@ -331,7 +331,7 @@ In these rows, most values come from the CKYC excel. Join CKYC to the working co
   - Source: the CKYC row with `Identification Type = CIN No` (only 1 exists today); otherwise the required-details file (143 borrowers). An LLPIN is written without its hyphen (`AAB-1234` → `AAB1234`). Title reports don't contain it.
 - **Column 12 - INDIVIDUAL_PAN** - PAN from CKYC, when Column 3 = `IND`
 - **Column 13 - INDIVIDUAL_CKYC_NUMBER** - **required when the individual has no PAN** (5 today: 4 "NO PAN" plus 1 other); otherwise blank. 14 digits, from the required-details file.
-- **Column 14 - GENDER** - `M`, `F` or `T` (`GENDER` sheet), when Column 3 = `IND`. It is **required for individuals**, but it is **not in the CKYC excel**, so take it from the required-details file (or ask the LMS team to add it to the query). `Male`/`Female` typed there are accepted.
+- **Column 14 - GENDER** - `M`, `F` or `T` (`GENDER` sheet), when Column 3 = `IND`. It is **required for individuals**. Take it from the CKYC excel's **`Gender`** column (`Male` → `M`, `Female` → `F`; added 2026-10-09: the CKYC table has it, the current extract does not yet). If it is blank or the column is missing, it is asked for in the required-details file, where `Male`/`Female` are accepted too.
 - **Column 15 - INDIVIDUAL_NAME** - CKYC `Customer Name`, when Column 3 = `IND`. Letters and spaces only (e.g. `SARVES .` → `SARVES`); max 50.
 - **Column 16 - FATHER_MOTHER_NAME** - father's or mother's name, when Column 3 = `IND`.
   - It is **required for individuals** and **not in the CKYC excel**, so take it from the required-details file.
@@ -357,7 +357,7 @@ As in Row 3 for the property, each borrower's address goes in their own row:
 - **Column 24 - DISTRICT** - District Code (same steps as Row 3). The borrower's PIN is the 6 digits before `, India` at the end of the address.
 - **Column 25 - STATE** - State Code
 - **Column 26 - PIN_CODE** - PIN code
-- **Column 27 - COUNTRY** - `IND`. The masters only have `IND`, and the other rows use `IND`, so keep it the same everywhere. The spec text says `"IN"` here; confirm with the first upload.
+- **Column 27 - COUNTRY** - `IN`. The batch format description gives `"IN"` for this field; it does not point to the COUNTRY master (only the IMM row does, which is why IMM uses `IND`).
 
 ---
 
@@ -375,7 +375,7 @@ This row is **fixed**: it is the same for every SI, and nothing is mapped into i
 - **Column 8 - DISTRICT** - `10680`
 - **Column 9 - STATE** - `21`
 - **Column 10 - PIN_CODE** - `400063`
-- **Column 11 - COUNTRY** - `IND`
+- **Column 11 - COUNTRY** - `IN` (a constant in the batch format description).
 
 ---
 
@@ -424,7 +424,7 @@ This row is **fixed**: it is the same for every SI, and nothing is mapped into i
 - **PAN alone is not compulsory**, but every borrower needs **either a PAN or a 14-digit CKYC number**. 436 current borrowers have no PAN (431 sole proprietorships, 4 "NO PAN", 1 individual), so they need a CKYC number from the required-details file.
 - **Gender, father's/mother's name and date of birth are required for every individual borrower** ("Conditional" in the spec means required when the borrower type is Individual).
 - None of them is needed for non-individuals.
-- Gender and father's/mother's name are **not in the CKYC excel** (or in the title reports). That is about 3,141 individuals today, so either fill them in the required-details file or ask the LMS team to add both to the CKYC query (much less manual work).
+- Father's/mother's name is **not in the CKYC excel** (or in the title reports), so it is filled in the required-details file (or the LMS team adds it to the CKYC query). Gender comes from the CKYC `Gender` column; only when it is blank is it typed.
 
 **2. What if the full address lists two flats under a single Collateral ID?**
 

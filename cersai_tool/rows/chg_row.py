@@ -3,6 +3,7 @@
 This row is fixed: it is the same for every security interest and never comes
 from any input file. To change it, change the values below.
 """
+from .. import settings
 from ..model import blank, fixed
 
 FIELDS = ["ROW_TYPE", "OFFICE_CODE", "OFFICE_NAME", "ADDRESS_LINE_1", "ADDRESS_LINE_2",
@@ -20,7 +21,7 @@ FIXED_VALUES = {
     "DISTRICT": "10680",        # MUMBAI SUBURBAN
     "STATE": "21",              # Maharashtra
     "PIN_CODE": "400063",
-    "COUNTRY": "IND",
+    "COUNTRY": settings.BOR_CHG_COUNTRY,   # "IN": a constant in the batch format description
 }
 
 

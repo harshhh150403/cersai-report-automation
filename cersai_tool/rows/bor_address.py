@@ -173,10 +173,10 @@ def col_26_pin_code(c, b, serial, row):
 
 
 # Column 27 - COUNTRY
-# Always "IND" (the only India code in the CERSAI masters; the spec text says
-# "IN" here - confirm with the first upload).
+# Always "IN": the batch format description gives this value for the borrower's
+# country. (The IMM row uses the COUNTRY master's code, IND.)
 def col_27_country(c, b, serial, row):
-    return fixed("COUNTRY", settings.COUNTRY)
+    return fixed("COUNTRY", settings.BOR_CHG_COUNTRY)
 
 
 # PIN is worked out before city and district, which depend on it; the row
