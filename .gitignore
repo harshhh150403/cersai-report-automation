@@ -1,7 +1,30 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
+
+# Operating-system and editor clutter
 .DS_Store
-~$*.xlsx
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Lock files Excel and Word leave while a file is open
+~$*
+
+# What the tool writes, and its test data (made by dev_tools/make_dummy_data.py)
+Output data/
 Dummy output data/
 Dummy input data/
+
+# The day's input files are copied in every day and are not part of the project.
+# The folders themselves stay (the tool reads from them), each kept by a .gitkeep file.
+Input data/*/*
+!Input data/*/.gitkeep
+
+# Reference files the tool does not read
+Output excel demo file/
+Output Excel Description/
+Master data/crs2_addrss_mstr_pincd_analysis_20260416.xlsx
+notes i created to map rows1/mapping notes.md
