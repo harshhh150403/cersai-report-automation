@@ -195,6 +195,8 @@ EMPTY_MESSAGES = {
     ("SI", "NUMBER_OF_ASSET_OWNERS"): "is empty: no owners are known for this collateral. Type the owners (OWNERS) in "
                                       "the required-details file and run step 2 again",
     ("SI", "NUMBER_OF_BORROWERS"): "is empty: CKYC has no borrowers for this application",
+    ("SI", "SI_TYPE_ID"): "is empty: no usable title report gives the type of mortgage. Type it (SI_TYPE_ID) in "
+                          "the required-details file and run step 2 again",
 }
 
 

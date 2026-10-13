@@ -62,7 +62,6 @@ BOR_CHG_COUNTRY = "IN"           # BOR and CHG rows: the batch format descriptio
                                  # (a constant for CHG); these rows do not use the COUNTRY master
 FINANCING_TYPE_ID = "1"          # Sole
 CONSORTIUM_MEMBERS = "0"
-DEFAULT_SI_TYPE_ID = "17"        # Equitable Mortgage, used when no title report
 TYPE_OF_CHARGE = "FIRST CHARGE"
 INCLUDE_LAN_IN_NARRATION = False     # True -> NARRATION = "LAN <loan account>"
 USE_GLOBAL_COLLATERAL_NO_AS_ASSET_UNIQUE_ID = True

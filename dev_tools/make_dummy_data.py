@@ -277,7 +277,7 @@ def build_applications():
                     "Karnataka- 560022, India", "560022", [("N Lokesh", 100)], built=1450, carpet=1200)],
         [loan(900301, "A", "22-JUL-26", 6500000)],
         case="Bangalore BBMP address (Katha, EPID, Ward, Hobli, Taluk): house number found, but not whether it is "
-             "a flat or a house; no survey/plot number; no title report (SI type default, owners not verified); "
+             "a flat or a house; no survey/plot number; no title report (SI type typed by hand, owners not verified); "
              "proprietorship with only GST/Udyam/Shop numbers (no PAN, so a CKYC number is needed); Last Name ' '; "
              "e-mail with a hyphen (not allowed by CERSAI)."))
 
@@ -695,7 +695,7 @@ def build_applications():
                     pdf=report("scanned", "Vikas Jain", "Mr. Vikas Jain",
                                "House No. 213, Scheme No. 78, Vijay Nagar, Indore, adm. 157.93 Sq. Mtrs."))],
         [loan(902301, "A", "12-AUG-26", 5500000)],
-        case="The title report is a scan with no text: it is reported and not used (SI type default, owners not "
+        case="The title report is a scan with no text: it is reported and not used (SI type typed by hand, owners not "
              "verified); a customer name with a dot ('RAKESH .') and no Gender in CKYC (typed in the "
              "required-details file); house = structure with land."))
 
@@ -1090,6 +1090,13 @@ COLLATERAL_ANSWERS = {
     "COLL00090047": {"PROJECT_NAME": "Kore Vasti"},
     "COLL00090049": {"ASSET_SUB_TYPE_ID": "1", "SURVEY_NUMBER": "8/112", "PROJECT_NAME": "R S Puram"},
 }
+# The type of mortgage (SI_TYPE_ID) where the title report is missing, scanned,
+# misnamed or about another property, so the tool asks for it: all equitable
+TYPED_SI_TYPES = {coll: "17" for coll in (
+    "COLL00090003", "COLL00090006", "COLL00090009", "COLL00090014", "COLL00090016", "COLL00090017",
+    "COLL00090022", "COLL00090024", "COLL00090025", "COLL00090026", "COLL00090028", "COLL00090029",
+    "COLL00090030", "COLL00090031", "COLL00090036", "COLL00090039", "COLL00090041", "COLL00090042",
+    "COLL00090043", "COLL00090045", "COLL00090046", "COLL00090047", "COLL00090049")}
 # Answers in the Check and correct sheet: (Collateral ID, row, field, value, why)
 CHECK_ANSWERS = [
     ("COLL00090025", "SI", "PDF_CHECK", "WRONG PDF", "the report is about another property"),
@@ -1850,11 +1857,13 @@ def write_answers(apps, path):
             if values:
                 people.append([a["app"], c["cif"], c["name"]] + [values.get(k) for k in people_keys])
     places = book.create_sheet("Collaterals")
-    place_keys = sorted({k for v in COLLATERAL_ANSWERS.values() for k in v})
+    answers = {coll: dict(COLLATERAL_ANSWERS.get(coll, {}), **({"SI_TYPE_ID": code} if code else {}))
+               for coll in set(COLLATERAL_ANSWERS) | set(TYPED_SI_TYPES) for code in [TYPED_SI_TYPES.get(coll)]}
+    place_keys = sorted({k for v in answers.values() for k in v})
     places.append(["Collateral ID", "Application number"] + place_keys)
     for a in apps:
         for col in a["collaterals"]:
-            values = COLLATERAL_ANSWERS.get(col["coll"])
+            values = answers.get(col["coll"])
             if values:
                 places.append([col["coll"], a["app"]] + [values.get(k) for k in place_keys])
     checks = book.create_sheet("Check and correct")

@@ -74,8 +74,8 @@ type another batch name such as `2026-09-30`.
 2. Otherwise CKYC / COLLATERAL.
 3. Otherwise the title report, only for what the LMS lacks (survey or plot number, area, project,
    PIN...). The type of mortgage (SI type) is only in the title report.
-4. Otherwise a default (SI type 17 Equitable Mortgage when there is no title report) or the value is
-   asked for.
+4. Otherwise the value is asked for in the required-details file. This includes the type of mortgage
+   (SI type) when there is no usable title report: no type is assumed.
 
 Property owners come from COLLATERAL (`Owner Name`) too. Their `Percentage Share` should add up to 100%
 and `Ownership Status` should match the number of owners (Single = one, Joint = more). The title report

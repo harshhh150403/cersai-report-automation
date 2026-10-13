@@ -330,7 +330,7 @@ Key: **M** = mandatory, **O** = optional, **C** = conditional. "Col" is the colu
 | 3 | D | NUMBER_OF_BORROWERS | M | Derived (§6.2) | Count of BOR rows written | ≥ 1; equals the BOR line count |
 | 4 | E | NUMBER_OF_ASSET_OWNERS | M | Derived (§6.3) from COLLATERAL `Owner Name` (count checked with `Percentage Share` and `Ownership Status`), checked against title report item 4 (the report's owners are used only when COLLATERAL has none); required details override | Number of non-borrower owners; 0 if all owners are borrowers | ≥ 0; equals the ASO line count |
 | 5 | F | NUMBER_OF_CONSORTIUM_MEMBERS | M | Constant | `0` | |
-| 6 | G | SI_TYPE_ID | M | **Title report item 8 "Nature of Mortgage"** (§15.5); the required-details file overrides | `Equitable Mortgage` → `17` (all 4 demo reports). Default **`17`** when there is no title report. | Must be in {17, 18, 19, 20, 21} |
+| 6 | G | SI_TYPE_ID | M | **Title report item 8 "Nature of Mortgage"** (§15.5); the required-details file overrides | `Equitable Mortgage` → `17` (all 4 demo reports). Blank, and asked for in the required-details file, when there is no usable title report (no default). | Must be in {17, 18, 19, 20, 21} |
 | 7 | H | SI_TYPE_OTHERS | C | Title report item 8 wording; required details override | Only when SI_TYPE_ID = 21 | ≤ 100, restricted chars |
 | 8 | I | FINANCING_TYPE_ID | M | Constant | `1` (Sole) | FINANCING_TYPE master |
 | 9 | J | SI_CREATION_DATE | M | CKYC `First Disbursal Date` | `DD-MM-YYYY` → `YYYY-MM-DD` (demo record: `2026-07-01`) | Not in the future, ≥ 1900. See §11 Q6 on whether the mortgage-deed date should be used instead. |
@@ -562,7 +562,7 @@ The sub-type keywords come from the address. "Structure without Land" fits units
 | Draft entry | Maps to | Level | Automatic source (LMS first, then title report; §15.6) | Comment |
 |---|---|---|---|---|
 | Count of property owner/owner name | SI.NUMBER_OF_ASSET_OWNERS, SI.IS_TPM, BOR.IS_ASSET_OWNER (and future ASO rows) | Per collateral | COLLATERAL `Owner Name` (count checked with `Percentage Share` and `Ownership Status`), checked against title report item 4 (the report's owners are used only when COLLATERAL has none) | Manual only when neither source has owners, an owner matches no borrower, or a reviewer corrects an owner difference listed in Check and correct (§6.3). |
-| security interest type | SI.SI_TYPE_ID (+ SI_TYPE_OTHERS) | Per SI | Title report item 8 (the LMS doesn't hold it) | Default 17 when there is no title report. |
+| security interest type | SI.SI_TYPE_ID (+ SI_TYPE_OTHERS) | Per SI | Title report item 8 (the LMS doesn't hold it) | Typed in the required-details file when there is no usable title report. |
 | Asset type | IMM.ASSET_TYPE_ID (+ ASSET_TYPE_OTHERS) | Per collateral | COLLATERAL `Property Type`; title report item 2 only to tell residential from commercial `PLOT`s | |
 | Asset Description | IMM.ASSET_DESCRIPTION | Per collateral | **Built** from LMS parts; gaps from title report item 1 | Manual only to improve the wording. |
 | Survey/Plot No | IMM.SURVEY_NUMBER / IMM.PLOT_NUMBER | Per collateral | LMS address; title report item 1 when the address has neither (39% of active addresses) | Keep them as **two columns**: they are different fields with different rules. |
@@ -686,7 +686,7 @@ CHG||ANANDRATHI GLOBAL FINANCE LIMITED|Express Zone B Wing 5th Floor Western Exp
 
 ### 10.3 Corrected version of the same record (target output / golden test)
 
-This is what the tool produces for the demo record from the current extract (no title report linked, so SI_TYPE_ID is the default 17), with gender and father's/mother's names typed in the required-details file (`<…>` marks them). It is re-checked whenever a rule changes. The field counts match the spec: FH 4, SI 15, IMM 27, BOR 27, CHG 11. Differences from the demo are deliberate: the area is the LMS carpet area (520), the description is built from the address, survey numbers are written without their label, NARRATION is blank (setting `INCLUDE_LAN_IN_NARRATION`), and borrowers after the primary one are ordered by Neo CIF ID. The line-end convention (no trailing pipe) is still to be confirmed.
+This is what the tool produces for the demo record from the current extract (no title report linked, so SI_TYPE_ID 17 was typed in the required-details file), with gender and father's/mother's names typed in the required-details file (`<…>` marks them). It is re-checked whenever a rule changes. The field counts match the spec: FH 4, SI 15, IMM 27, BOR 27, CHG 11. Differences from the demo are deliberate: the area is the LMS carpet area (520), the description is built from the address, survey numbers are written without their label, NARRATION is blank (setting `INCLUDE_LAN_IN_NARRATION`), and borrowers after the primary one are ordered by Neo CIF ID. The line-end convention (no trailing pipe) is still to be confirmed.
 
 ```
 FH|SI_REGN|1|2026-09-30
@@ -735,7 +735,7 @@ Each item has a recommended default so implementation can start; please confirm 
 | Q27 | Sub-type for units in a building | Is a flat, shop or office in a co-operative society "Structure without Land"? | Yes: 2 (residential) / 5 (commercial) / 8 (other). Confirm with compliance. |
 | Q28 | Old vs new survey numbers; town-planning plots | Reports can give `Old S. No. … New S. No. … Hissa No.` or `PF No. 4 of TP`. | New survey number with its Hissa (`12/2`). A town-planning scheme's final plot number goes to PLOT_NUMBER. |
 | Q29 | Title report not fully positive | 2 of 4 demo reports say "Positive subject to search", and their Final Certificate is struck through. | File anyway (the mortgage exists), but show the status in the review sheet. |
-| Q30 | Missing, unreadable or shared title reports | A collateral may have no PDF, a scanned PDF without text, or share one report with another collateral. | No PDF or no text: the LMS values are used as normal; the type of mortgage defaults to 17, and any remaining gaps go to the required-details file. List the collateral. Shared report: save a copy under each collateral's name. |
+| Q30 | Missing, unreadable or shared title reports | A collateral may have no PDF, a scanned PDF without text, or share one report with another collateral. | No PDF or no text: the LMS values are used as normal; the type of mortgage and any remaining gaps go to the required-details file. List the collateral. Shared report: save a copy under each collateral's name. |
 | Q31 | Source priority | **Resolved 2026-09-30:** LMS input data first; a title report is read only for values the input data doesn't have (§15.6). Owners follow it too: COLLATERAL first, checked against the title report (§6.3). | — |
 | Q32 | Owners differ between COLLATERAL and the title report | Which list to file? It decides IS_ASSET_OWNER, NUMBER_OF_ASSET_OWNERS and IS_TPM. | **Decided 2026-09-30:** file the COLLATERAL owners and show both lists in Check and correct, where the owners can be typed; the title report's owners are used only when COLLATERAL has none, and its extra owners are added only when the COLLATERAL shares show an owner is missing (§6.3). |
 
@@ -882,7 +882,7 @@ Added 2026-09-30 from four demo reports. Their file names were made up only to s
 1. List `Input data/Legal/*.pdf` and split each name with the pattern `^(APPL\d{8})_(COLL\d{8})\.pdf$` (extension in any case). A name that doesn't fit → exception "bad file name".
 2. Look up the Collateral ID in COLLATERAL (any loan status). It must match exactly, and because a collateral belongs to one application only, COLLATERAL must list it under the application in the file name. Listed under another application → exception "misfiled PDF: rename". Not in COLLATERAL at all → exception "no such collateral" (for example a typo in the name). Don't guess which half of the name is wrong.
 3. Two PDFs for the same collateral → exception.
-4. Active collaterals with no PDF are listed as "no title report". Their values come from the LMS as normal; the type of mortgage defaults to 17, and any remaining gaps go to the required-details file.
+4. Active collaterals with no PDF are listed as "no title report". Their values come from the LMS as normal; the type of mortgage and any remaining gaps go to the required-details file.
 
 The Legal folder keeps PDFs from earlier days, so only PDFs that concern the current batch are reported. A report of a collateral that is not in the batch (filed earlier, or not active) is ignored silently, even when another collateral of the same application is in the batch. *(implementation)*
 
@@ -984,7 +984,7 @@ The PIN is missing in 3 of the 4 files.
 6. **Normalise before matching:** collapse spaces, rejoin `Co- op` → `Co-op`, straighten curly quotes, ignore case, and accept known typos (`Commerical`).
 7. **Split the owner list** on `,`, `&` and `and` (any case). If a piece starts with a company word (Company, Co, Associates, Enterprises, Industries, Traders, Sons, Brothers, Pvt, Private, Ltd, Limited, LLP, Trust), join it back to the previous piece: `X AND COMPANY` is one owner (40 LMS owner names contain "and" like this). Then remove honorifics (`Mr.`, `Mrs.`, `Ms.`, `Smt.`, `Shri`, `Dr.`, `M/s.`).
 8. **Keep the evidence:** store each value with its page and source sentence for the review sheet.
-9. **No text layer** (a scanned report): list it in the exceptions. The LMS values are used as normal, the type of mortgage defaults to 17, and any remaining gaps go to the required-details file.
+9. **No text layer** (a scanned report): list it in the exceptions. The LMS values are used as normal; the type of mortgage and any remaining gaps go to the required-details file.
 
 ### 15.5 Mapping to CERSAI fields
 

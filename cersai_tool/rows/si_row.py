@@ -114,8 +114,9 @@ def col_05_number_of_consortium_members(c, row):
 #   mortgage -> 19, Conditional sale -> 20, anything else -> 21 (Other).
 #   Never read from the report's "Final Certificate", which one law firm
 #   strikes out while a search is pending.
-# If it can't be found: no usable title report or no item 8 -> 17 (Equitable
-#   Mortgage), and the collateral is listed so someone can confirm it.
+# If it can't be found: no usable title report or no item 8 -> left blank and
+#   asked for in the required-details file (it is mandatory, so the SI stays out
+#   of the .DAT file until it is typed). No type of mortgage is assumed.
 def col_06_si_type_id(c, row):
     typed = c.ov("SI_TYPE_ID")
     if typed is not None:
@@ -129,7 +130,7 @@ def col_06_si_type_id(c, row):
     if code:
         return ok("SI_TYPE_ID", code, SRC_PDF, f"title report item 8: '{text}'")
     why = "no usable title report" if not report else "title report item 8 not found"
-    return default("SI_TYPE_ID", settings.DEFAULT_SI_TYPE_ID, f"{why}; 17 (Equitable Mortgage) assumed")
+    return missing("SI_TYPE_ID", f"{why}: type the type of mortgage (17 Equitable, 18 Registered, ...)")
 
 
 # Column 7 - SI_TYPE_OTHERS

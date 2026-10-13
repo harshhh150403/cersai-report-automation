@@ -84,7 +84,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   3. Check that the collateral belongs to the application in the file name. A collateral belongs to one application only, so if COLLATERAL lists it under another application, flag the PDF as misfiled (rename it).
 
      The Legal folder keeps the PDFs of earlier days: a PDF of a collateral that is not in the current batch (filed earlier, or not active) is ignored, even when another collateral of the same application is in the batch.
-  4. List the active collaterals that have no PDF. Their values come from the input data as normal; the type of mortgage defaults to `17`, and any remaining gaps go to the required-details file.
+  4. List the active collaterals that have no PDF. Their values come from the input data as normal; the type of mortgage and any remaining gaps go to the required-details file.
   5. **Check it's the right PDF** before taking any value from it (otherwise a misnamed PDF would fill gaps with another property's details):
      - "Loan applicant" ≈ the CKYC primary borrower;
      - owners (item 4) ≈ COLLATERAL `Owner Name`;
@@ -164,7 +164,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - Only look at rows where "Asset Category Description" = `Immovable` (IDs 17–21). `Conditional Sale` and `Other` also appear for movable and intangible assets (e.g. `Other` = 21, 27 and 29).
   - Valid values: 17 Equitable Mortgage, 18 Registered Mortgage, 19 Agreement to Create Mortgage (UUC), 20 Conditional Sale, 21 Other.
   - Never read it from the report's "Final Certificate" paragraph: one law firm strikes that paragraph out while a search is pending.
-  - If there is no usable title report and nothing is typed, default to `17` and list it for confirmation.
+  - If there is no usable title report and nothing is typed, leave it blank: it is asked for in the required-details file, and the SI stays out of the `.DAT` file until it is typed (it is mandatory). No type is assumed (decided 2026-10-13).
 - **Column 7 - SI_TYPE_OTHERS** - blank by default. It is **mandatory when Column 6 = 21 (Other)**; then take the description from the title report's item 8 wording, or from the required-details file (max 100 characters).
 - **Column 8 - FINANCING_TYPE_ID** - financing type is "Sole" by default, so value `1`
 - **Column 9 - SI_CREATION_DATE** - disbursal date.
@@ -442,7 +442,7 @@ If the legal team treats each flat as a separate mortgage, it should be split in
 **3. What if a collateral has no title report, or the PDF can't be read?**
 
 - It is listed in the Issues sheet of the working and final Excel files.
-- The input data is used as normal, and the owners from COLLATERAL are marked "not verified". SI Column 6 defaults to `17` unless the required-details file says otherwise, and any gaps the title report would have filled (for example a missing survey number) are asked for there.
+- The input data is used as normal, and the owners from COLLATERAL are marked "not verified". SI Column 6 (type of mortgage) is asked for in the required-details file, as are any gaps the title report would have filled (for example a missing survey number) are asked for there.
 - A scanned PDF with no text layer is handled the same way until OCR is added.
 
 **4. What if the title report and the input data disagree (e.g. owners or flat number)?**
