@@ -20,7 +20,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .. import settings
-from ..model import BLANK, CONFLICT, DEFAULT, INVALID, MISSING, NA, SRC_MANUAL, SRC_PDF
+from ..model import BLANK, CONFLICT, INVALID, MISSING, NA, SRC_MANUAL, SRC_PDF
 from ..rows import bor_row, chg_row, fh_row, imm_row, si_row
 from ..rules.text import as_text
 
@@ -30,20 +30,19 @@ FIRST_VALUE_COLUMN = 2                     # column B
 COLLATERAL_COLUMN, APPLICATION_COLUMN, BORROWER_COLUMN = 30, 31, 32     # AD, AE, AF
 ROWS_SHEET = "CERSAI rows"
 
+# five clearly different colours (black text stays readable on each)
 FILLS = {
     "lms": "FF92D050",        # green: found in CKYC / COLLATERAL, fixed, or worked out
-    "pdf": "FFFFEB84",        # yellow: taken from the title report
-    "manual": "FF9BC2E6",     # blue: typed in the required-details file
-    "conflict": "FFF4B084",   # orange: LMS and title report disagree
-    "default": "FFFFC000",    # amber: a default was used - confirm it
-    "problem": "FFFF7C80",    # red: missing or invalid - must be fixed
+    "pdf": "FFB4A7FF",        # lavender: taken from the title report
+    "manual": "FF5BC0EB",     # sky blue: typed in the required-details file
+    "conflict": "FFFF9900",   # orange: LMS and title report disagree
+    "problem": "FFFF3B3B",    # red: missing or invalid - must be fixed
 }
 LEGEND = [
     ("lms", "Found in CKYC / COLLATERAL, a fixed value, or worked out from them"),
     ("pdf", "Taken from the legal title report (the LMS did not have it)"),
     ("manual", "Typed in the required-details file"),
     ("conflict", "The LMS and the title report disagree: the value shown is the one used; check it"),
-    ("default", "Not found: a default was used; confirm it"),
     ("problem", "Missing or invalid: must be filled before the .DAT file is made"),
 ]
 ISSUE_HEADERS = ["Collateral ID", "Application number", "Row", "Borrower", "Field", "Level", "Problem", "Details"]
@@ -55,8 +54,6 @@ def fill_key(cell):
         return "problem"
     if cell.status == CONFLICT:
         return "conflict"
-    if cell.status == DEFAULT:
-        return "default"
     if cell.status in (BLANK, NA):
         return None
     if cell.source == SRC_MANUAL:
@@ -99,8 +96,6 @@ def cell_problems(block) -> list:
                 level, what = "needs value", "Invalid"
             elif cell.status == CONFLICT:
                 level, what = "check", "LMS and title report differ"
-            elif cell.status == DEFAULT:
-                level, what = "check", "Default used"
             else:
                 continue
             details = cell.note

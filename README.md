@@ -54,7 +54,8 @@ type another batch name such as `2026-09-30`.
 
 ## Filling the required-details file
 
-- **Yellow, empty**: needed. **Amber**: a default the tool used (leave it to accept it).
+- **Yellow, empty**: needed. The tool never assumes a value it cannot find (type of mortgage, asset
+  type, type of charge, secured amount...): it leaves it blank and asks for it here.
   **Grey**: found by the tool (type over it only to correct it). **Orange**: the LMS and the title
   report disagree. **Blue**: typed for the same collateral or borrower in an earlier batch.
   **Dark grey**: does not apply.
@@ -103,7 +104,7 @@ own and lists the decision in Check and correct, where a `Y` or `N` changes it:
 | One COLLATERAL Owner Name holds two people ("A and B")                                                                  | Taken as two owners when each is a borrower (company names with "and" stay whole); otherwise shown in Check and correct.                                                                            |
 | Two collaterals of one application seem to have each other's title reports                                              | Both SIs are held; rename the two files and run step 1 again, or answer`WRONG PDF`.                                                                                                               |
 | Two collaterals of one application have the same address                                                                | A warning on both SIs: check that the same property is not recorded twice.                                                                                                                          |
-| The same property secures another active loan                                                                           | TYPE_OF_CHARGE is shown as a default to confirm.                                                                                                                                                    |
+| The same property secures another active loan                                                                           | TYPE_OF_CHARGE is left blank and asked for.                                                                                                                                                        |
 | A title report file is misnamed, misfiled or scanned (no text)                                                          | Listed in the Issues sheet; the file is not used.                                                                                                                                                   |
 | CERSAI rejects an SI you already filed                                                                                  | In`Output data/Filed register.xlsx`, change its Status from `Filed` to `Pending` (or delete its row). It will come back in the next batch.                                                    |
 | Step 2 is run again after the final Excel was edited by hand                                                            | The edited file is kept as a`(backup ...)` copy.                                                                                                                                                  |
@@ -117,7 +118,7 @@ and 3 rely on it.
 ## Settings
 
 `cersai_tool/settings.py` holds the fixed choices, for example the entity code in the file name
-(`J8084`), the default type of charge, whether to put the loan account in NARRATION, whether to use
+(`J8084`), the type of charge for a property that secures no other loan, whether to put the loan account in NARRATION, whether to use
 the Global collateral No as ASSET_UNIQUE_ID, the name-matching thresholds, and the 10% area tolerance.
 The charge-holder (CHG) row is fixed in `cersai_tool/rows/chg_row.py`.
 

@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 SRC_LMS = "LMS"
 SRC_PDF = "Title report"
 SRC_MANUAL = "Required details"
-SRC_DEFAULT = "Default"
 SRC_FIXED = "Fixed"
 SRC_DERIVED = "Derived"
 
@@ -20,11 +19,10 @@ OK = "ok"                # found and valid
 BLANK = "blank"          # optional and not found: left empty on purpose
 NA = "n/a"               # does not apply to this row (e.g. gender for a company)
 MISSING = "missing"      # required but not found anywhere: must be filled by hand
-DEFAULT = "default"      # a default was used; someone should confirm it
 INVALID = "invalid"      # a value was found but breaks a CERSAI rule
 CONFLICT = "conflict"    # LMS and title report disagree; see lms_value / pdf_value
 
-NEEDS_INPUT = (MISSING, DEFAULT, INVALID)
+NEEDS_INPUT = (MISSING, INVALID)
 
 # Typing this word in the required-details file leaves an optional value empty
 CLEAR_WORD = "BLANK"
@@ -84,10 +82,6 @@ def not_applicable(field_name, note="") -> Cell:
 
 def missing(field_name, note) -> Cell:
     return Cell(field_name, "", "", MISSING, note)
-
-
-def default(field_name, value, note) -> Cell:
-    return Cell(field_name, str(value), SRC_DEFAULT, DEFAULT, note)
 
 
 def invalid(field_name, bad_value, note) -> Cell:

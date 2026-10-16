@@ -352,7 +352,7 @@ def build_applications():
                     "Panchmahal, Gujarat- 389350, India", "389350", [("Bhavesh Patel", 100)], carpet=2700.75,
                     nature="GRAM PANCHAYAT", purpose="Vacant")],
         [loan(900601, "A", "09-SEP-26", 2500000)],
-        case="PLOT with no title report: asset type defaults to 3 (Other, 'Plot'); a proprietorship tagged "
+        case="PLOT with no title report: the asset type is typed by hand (3 Other, 'Plot'); a proprietorship tagged "
              "'individual' in CKYC Applicant Type (so CKYC has a date of birth but no incorporation date: "
              "registration date needed); proprietor and firm share one PAN; Gram Panchayat land."))
 
@@ -570,8 +570,8 @@ def build_applications():
                     built=900, carpet=760, purpose="Rented")],
         [loan(901401, "A", "15-JUL-26", 11000000)],
         case="The same property (same Global collateral No) also secures APPL00090015, recorded there under its "
-             "own Collateral ID (a Collateral ID belongs to one application only): TYPE_OF_CHARGE needs "
-             "confirming; single borrower; the city is MALAD (more specific than the general 'Mumbai')."))
+             "own Collateral ID (a Collateral ID belongs to one application only): TYPE_OF_CHARGE is "
+             "left blank and typed by hand (FIRST CHARGE); single borrower; the city is MALAD (more specific than the general 'Mumbai')."))
     apps.append(application(
         "APPL00090015", "Mumbai 3", "20-08-2026",
         [firm(90151, "MEHTA TRADING CO.", "Partnership Firm", "primary", "12-DEC-01", "AAAFM3434N",
@@ -580,8 +580,8 @@ def build_applications():
         [collateral("COLL00090017", "CMS09090099", "COMMERCIAL", express_zone, "400097", [("Harish Mehta", 100)],
                     built=900, carpet=760, purpose="Rented")],
         [loan(901501, "A", "20-AUG-26", 5000000)],
-        case="Second loan on the same property as APPL00090014, with its own Collateral ID (TYPE_OF_CHARGE to "
-             "confirm); the same customer (same Neo CIF ID) on two applications."))
+        case="Second loan on the same property as APPL00090014, with its own Collateral ID (TYPE_OF_CHARGE "
+             "left blank and typed by hand: SECOND CHARGE); the same customer (same Neo CIF ID) on two applications."))
 
     # D18 - no owners in COLLATERAL; the title report names them.
     kalyan_home = "Flat No. 3, Om Sai Apartment, Katemanivali, Kalyan East, Thane, Maharashtra- 421306, India"
@@ -722,7 +722,8 @@ def build_applications():
         [loan(902401, "A", "06-AUG-26", 5000000), loan(902402, "A", "20-SEP-26", 5500000, 2000000)],
         case="Industrial gala (asset type 3); COLLATERAL Property Pincode 401299 is not in the CERSAI master, so "
              "the PIN in the title report (401 208, also at the end of the LMS address) is used; LMS and title-report areas differ by more than 10%; "
-             "two active loan accounts with different sanctioned amounts; a company tagged 'individual' (no "
+             "two active loan accounts with different sanctioned amounts (the secured amount is typed by hand); "
+             "a company tagged 'individual' (no "
              "incorporation date, no CIN); the company itself is the owner ('Pvt Ltd' = 'PRIVATE LIMITED'); the "
              "title report's loan applicant is an old company name (one right-PDF check fails: warning only)."))
 
@@ -1067,10 +1068,12 @@ COLLATERAL_ANSWERS = {
     "COLL00090003": {"ASSET_SUB_TYPE_ID": "1", "SURVEY_NUMBER": "422/309", "PROJECT_NAME": "Shivaganga Layout"},
     "COLL00090004": {"PROJECT_NAME": "Kushaiguda"},
     "COLL00090005": {"PROJECT_NAME": "Shri Krishna Nagar Scheme"},
+    "COLL00090006": {"ASSET_TYPE_ID": "3"},                     # a plot with no title report: Other
     "COLL00090009": {"ASSET_SUB_TYPE_ID": "7"},
     "COLL00090011": {"ASSET_SUB_TYPE_ID": "4", "SURVEY_NUMBER": "1542/3", "PROJECT_NAME": "Anna Nagar East"},
     "COLL00090014": {"PROJECT_NAME": "Kingsway Grove"},
-    "COLL00090016": {"SURVEY_NUMBER": "520/1", "PROJECT_NAME": "Pinnacle Zone"},
+    "COLL00090016": {"SURVEY_NUMBER": "520/1", "PROJECT_NAME": "Pinnacle Zone",
+                     "TYPE_OF_CHARGE": "FIRST CHARGE"},     # the first loan on the property
     "COLL00090017": {"SURVEY_NUMBER": "520/1", "PROJECT_NAME": "Pinnacle Zone",
                      "TYPE_OF_CHARGE": "SECOND CHARGE"},     # the second loan on the same property
     "COLL00090022": {"ASSET_SUB_TYPE_ID": "1", "HOUSE_NUMBER": "B-17", "PROJECT_NAME": "Bhagat Colony",
@@ -1083,11 +1086,11 @@ COLLATERAL_ANSWERS = {
     "COLL00090031": {"SURVEY_NUMBER": "77/2", "PROJECT_NAME": "Adarsh Nagar", "CITY": "2532",
                      "DISTRICT": "158"},
     "COLL00090039": {"SURVEY_NUMBER": "67/3"},
-    "COLL00090041": {"PROJECT_NAME": "Shahapur Village"},
+    "COLL00090041": {"PROJECT_NAME": "Shahapur Village", "ASSET_TYPE_ID": "3"},
     "COLL00090044": {"PROJECT_NAME": "Shreeji Bungalows"},
     "COLL00090045": {"SURVEY_NUMBER": "284/1"},
-    "COLL00090046": {"PROJECT_NAME": "Kore Vasti"},
-    "COLL00090047": {"PROJECT_NAME": "Kore Vasti"},
+    "COLL00090046": {"PROJECT_NAME": "Kore Vasti", "ASSET_TYPE_ID": "3"},      # agricultural plots: Other
+    "COLL00090047": {"PROJECT_NAME": "Kore Vasti", "ASSET_TYPE_ID": "3"},
     "COLL00090049": {"ASSET_SUB_TYPE_ID": "1", "SURVEY_NUMBER": "8/112", "PROJECT_NAME": "R S Puram"},
 }
 # The type of mortgage (SI_TYPE_ID) where the title report is missing, scanned,

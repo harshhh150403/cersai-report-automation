@@ -14,7 +14,7 @@ flagged side by side in the required-details file.
 import re
 
 from .. import settings
-from ..model import (SRC_LMS, SRC_PDF, blank, conflict, default, derived, fixed, invalid, manual, missing,
+from ..model import (SRC_LMS, SRC_PDF, blank, conflict, derived, fixed, invalid, manual, missing,
                      not_applicable, ok)
 from ..rules.address import unit_structure
 from ..rules.text import DESCRIPTION, HOUSE, ORG_NAME, STREET, SURVEY, ADDRESS, as_text, clean, \
@@ -75,8 +75,9 @@ def col_02_asset_category_id(c, row):
 #   immovable property": Residential -> 1, Commercial -> 2).
 # Rules: when the title report says Residential/Commercial and the LMS type
 #   says the other, the LMS value is used and the difference is flagged.
-# If it can't be found: a PLOT without a title report, or an unknown property
-#   type -> 3 (Other), listed so someone can confirm it.
+# If it can't be found: a PLOT without a title report saying Residential or
+#   Commercial, or an unknown property type -> left blank and asked for in the
+#   required-details file (no type is assumed).
 def col_03_asset_type_id(c, row):
     typed = c.ov("ASSET_TYPE_ID")
     if typed is not None:
@@ -89,10 +90,12 @@ def col_03_asset_type_id(c, row):
     if lms_type == "PLOT":
         if pdf_code:
             return ok("ASSET_TYPE_ID", pdf_code, SRC_PDF, f"plot; title report item 2 '{c.report['nature']}'")
-        return default("ASSET_TYPE_ID", "3", "PLOT with no title report saying Residential/Commercial; 3 assumed")
+        return missing("ASSET_TYPE_ID", "PLOT with no title report saying Residential or Commercial: type 1 "
+                                        "(Residential), 2 (Commercial) or 3 (Other)")
     code = PROPERTY_TYPES.get(lms_type)
     if not code:
-        return default("ASSET_TYPE_ID", "3", f"unknown COLLATERAL Property Type '{lms_type}'; 3 assumed")
+        return missing("ASSET_TYPE_ID", f"unknown COLLATERAL Property Type '{lms_type}': type 1 (Residential), "
+                                        "2 (Commercial) or 3 (Other)")
     if pdf_code and code in ("1", "2") and pdf_code != code:
         return conflict("ASSET_TYPE_ID", code, SRC_LMS, f"{code} ({lms_type})",
                         f"{pdf_code} ({c.report['nature']})", "LMS property type and title report disagree")
@@ -124,7 +127,8 @@ def col_04_asset_type_others(c, row):
 #     COLLATERAL Property Type PLOT                  -> Land without Structure
 # Rules: the code depends on the asset type (column 3), from the
 #   ASSET_SUB_TYPE_ID master: Residential 1/2/3, Commercial 4/5/6, Other 7/8/19.
-# If it can't be found: reported as missing.
+# If it can't be found: reported as missing. While the asset type is not known
+#   it is left blank: it is worked out once ASSET_TYPE_ID is typed.
 def col_05_asset_sub_type_id(c, row):
     asset_type = row["ASSET_TYPE_ID"].value
     allowed = c.masters.sub_types_for(asset_type)
@@ -134,6 +138,8 @@ def col_05_asset_sub_type_id(c, row):
         if code not in allowed:
             return invalid("ASSET_SUB_TYPE_ID", code, f"not a sub-type of asset type {asset_type}")
         return manual("ASSET_SUB_TYPE_ID", code)
+    if not asset_type:
+        return blank("ASSET_SUB_TYPE_ID", "worked out once the asset type (ASSET_TYPE_ID) is typed")
     source, why = SRC_LMS, ""
     if c.bundle["property_type"] == "PLOT":
         structure, why = "land", "COLLATERAL Property Type PLOT"

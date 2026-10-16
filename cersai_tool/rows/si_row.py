@@ -3,7 +3,7 @@
 import re
 
 from .. import settings
-from ..model import (DEFAULT, SRC_LMS, SRC_PDF, Cell, blank, conflict, default, derived, fixed, invalid,
+from ..model import (SRC_LMS, SRC_PDF, Cell, blank, conflict, derived, fixed, invalid,
                      manual, missing, not_applicable, ok)
 from ..rules import dates
 from ..rules.text import DESCRIPTION, as_text, clean
@@ -176,9 +176,10 @@ def col_09_si_creation_date(c, row):
 # Column 10 - TOTAL_SECURED_AMOUNT
 # Where it comes from: COLLATERAL "Sanctioned Loan Amount" of the active loan.
 # Rules: digits only (commas removed), at most 2 decimals, greater than 0.
-#   Every active row of a collateral should show the same amount; if they
-#   differ, the first is used and the collateral is listed for confirmation.
-# If it can't be found: reported as missing.
+#   Every active row of a collateral should show the same amount.
+# If it can't be found: no amount, or active rows with different amounts ->
+#   left blank and asked for in the required-details file (no amount is
+#   assumed).
 def col_10_total_secured_amount(c, row):
     typed = c.ov("TOTAL_SECURED_AMOUNT")
     amounts = [_amount(a) for a in c.bundle["sanctioned_amounts"]]
@@ -190,8 +191,8 @@ def col_10_total_secured_amount(c, row):
     if not amounts:
         return missing("TOTAL_SECURED_AMOUNT", "no sanctioned amount in COLLATERAL")
     if len(set(amounts)) > 1:
-        return default("TOTAL_SECURED_AMOUNT", amounts[0],
-                       f"active rows show different sanctioned amounts ({', '.join(amounts)}); first used")
+        return missing("TOTAL_SECURED_AMOUNT",
+                       f"active rows show different sanctioned amounts ({', '.join(amounts)}): type the secured amount")
     return ok("TOTAL_SECURED_AMOUNT", amounts[0], SRC_LMS, "COLLATERAL Sanctioned Loan Amount")
 
 
@@ -230,19 +231,20 @@ def col_12_narration(c, row):
 
 
 # Column 13 - TYPE_OF_CHARGE
-# Always "FIRST CHARGE", unless a different charge is typed in the
-# required-details file.
-# Rules: letters and spaces only, max 20. When the same property (same
-#   COLLATERAL "Global collateral No") also secures another active loan, the
-#   collateral is listed so someone can confirm first, second or pari passu.
+# "FIRST CHARGE" (settings.TYPE_OF_CHARGE), unless a different charge is typed
+# in the required-details file.
+# Rules: letters and spaces only, max 20.
+# If it can't be found: when the same property (same COLLATERAL "Global
+#   collateral No") also secures another active loan, the charge is not known ->
+#   left blank and asked for (first, second, pari passu...). No charge is assumed.
 def col_13_type_of_charge(c, row):
     typed = c.ov("TYPE_OF_CHARGE")
     if typed is not None:
         return manual("TYPE_OF_CHARGE", clean(typed, "", 20, letters_only=True, upper=True))
     shared = c.bundle.get("shared_with_applications") or []
     if shared:
-        return default("TYPE_OF_CHARGE", settings.TYPE_OF_CHARGE,
-                       f"this property also secures application(s) {', '.join(shared)}: confirm the charge")
+        return missing("TYPE_OF_CHARGE", f"this property also secures application(s) {', '.join(shared)}: type "
+                                         "the type of charge (FIRST CHARGE, SECOND CHARGE, PARI PASSU...)")
     return fixed("TYPE_OF_CHARGE", settings.TYPE_OF_CHARGE)
 
 

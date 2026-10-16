@@ -76,7 +76,7 @@ def run(paths, batch_name=None, assume_yes=False, log=print, today=None):
     ready, waiting = [], []
     for block in blocks:
         problems = list(dict.fromkeys(f"{kind} {c.field}" for kind, cells, _ in block.rows for c in cells
-                                      if c.status in NEEDS_INPUT and c.status != "default"))
+                                      if c.status in NEEDS_INPUT))
         if problems or block.held or block.tpm:
             reason = f"held: {'; '.join(block.hold_reasons)}" if block.held else \
                 "third-party mortgage" if block.tpm else \
@@ -85,11 +85,9 @@ def run(paths, batch_name=None, assume_yes=False, log=print, today=None):
         else:
             ready.append(block.collateral_id)
     conflicts = sum(1 for b in blocks for _, cells, _ in b.rows for c in cells if c.status == CONFLICT)
-    defaults = sum(1 for b in blocks for _, cells, _ in b.rows for c in cells if c.status == "default")
     log(f"  ready for the .DAT file: {len(ready)} of {len(blocks)} SI(s)")
-    if conflicts or defaults:
-        log(f"  still to look at: {conflicts} LMS / title report difference(s), {defaults} default value(s) "
-            "(sheet Issues)")
+    if conflicts:
+        log(f"  still to look at: {conflicts} LMS / title report difference(s) (sheet Issues)")
     for line in waiting[:15]:
         log(f"  not ready - {line}")
     if len(waiting) > 15:

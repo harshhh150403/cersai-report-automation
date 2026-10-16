@@ -197,6 +197,12 @@ EMPTY_MESSAGES = {
     ("SI", "NUMBER_OF_BORROWERS"): "is empty: CKYC has no borrowers for this application",
     ("SI", "SI_TYPE_ID"): "is empty: no usable title report gives the type of mortgage. Type it (SI_TYPE_ID) in "
                           "the required-details file and run step 2 again",
+    ("SI", "TOTAL_SECURED_AMOUNT"): "is empty: no sanctioned amount, or the active loan rows show different ones. "
+                                    "Type it in the required-details file and run step 2 again",
+    ("SI", "TYPE_OF_CHARGE"): "is empty: the property also secures another loan, so the type of charge must be "
+                              "typed in the required-details file. Run step 2 again after",
+    ("IMM", "ASSET_TYPE_ID"): "is empty: the asset type could not be worked out. Type it (ASSET_TYPE_ID) in the "
+                              "required-details file and run step 2 again",
 }
 
 

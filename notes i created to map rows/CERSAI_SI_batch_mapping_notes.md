@@ -334,10 +334,10 @@ Key: **M** = mandatory, **O** = optional, **C** = conditional. "Col" is the colu
 | 7 | H | SI_TYPE_OTHERS | C | Title report item 8 wording; required details override | Only when SI_TYPE_ID = 21 | ≤ 100, restricted chars |
 | 8 | I | FINANCING_TYPE_ID | M | Constant | `1` (Sole) | FINANCING_TYPE master |
 | 9 | J | SI_CREATION_DATE | M | CKYC `First Disbursal Date` | `DD-MM-YYYY` → `YYYY-MM-DD` (demo record: `2026-07-01`) | Not in the future, ≥ 1900. See §11 Q6 on whether the mortgage-deed date should be used instead. |
-| 10 | K | TOTAL_SECURED_AMOUNT | M | COLLATERAL `Sanctioned Loan Amount`, from any active row of the collateral (the value is the same on all of them) | Whole rupees, no commas; flag the collateral if its active rows disagree | > 0; at most 13 characters; at most 2 decimals. See §11 Q7. |
+| 10 | K | TOTAL_SECURED_AMOUNT | M | COLLATERAL `Sanctioned Loan Amount`, from any active row of the collateral (the value is the same on all of them) | Whole rupees, no commas; if the active rows disagree, left blank and asked for (no amount assumed) | > 0; at most 13 characters; at most 2 decimals. See §11 Q7. |
 | 11 | L | ENTITY_MIS_TOKEN | M | Application number + Collateral ID | Compressed to fit 20 characters: `A` + 8 digits of the application + `C` + 8 digits of the collateral, e.g. `A00027326C00266688` (18 characters, reversible) | Alphanumeric only; ≤ 20. **The demo value is 24 characters.** |
 | 12 | M | NARRATION | O | COLLATERAL `Loan Account #` | Proposed `LAN ARGFLLAPMUM2000005018390`, which keeps the loan account number that doesn't fit in the MIS token. Blank is also fine; avoid `NA`. | ≤ 100, restricted chars |
-| 13 | N | TYPE_OF_CHARGE | M | Constant, with required details override | `FIRST CHARGE`. Override for properties already securing another loan (§11 Q12); the LMS finds these through a shared `Global collateral No`. | Letters and spaces only; ≤ 20 |
+| 13 | N | TYPE_OF_CHARGE | M | Constant, with required details override | `FIRST CHARGE`. For properties already securing another loan (§11 Q12; the LMS finds these through a shared `Global collateral No`), left blank and asked for in the required-details file. | Letters and spaces only; ≤ 20 |
 | 14 | O | IS_TPM | M | Derived (§6.3) | `1` if NUMBER_OF_ASSET_OWNERS > 0, else `0` | 0 or 1 |
 | 15 | P | BATCH_REF_NUMBER | O | Generated | Blank, **or** exactly 20 alphanumeric characters, e.g. `ARGF` + file date `YYYYMMDD` + 8 digits of the collateral = `ARGF2026090100266688` | **Exactly 20 characters**, alphanumeric only |
 
@@ -349,7 +349,7 @@ The LMS source listed first is used whenever it gives a usable value. "Title rep
 |---|---|---|---|---|---|---|
 | 1 | B | ROW_TYPE | M | Constant | `IMM` | |
 | 2 | C | ASSET_CATEGORY_ID | M | Constant | `1` (Immovable) | |
-| 3 | D | ASSET_TYPE_ID | M | COLLATERAL `Property Type` (never blank); required details override | Mapping in §8.7. For `PLOT` (35 collaterals), use title report item 2 "Nature of immovable property" to choose: `Residential` → 1, `Commercial` (also the typo `Commerical`) → 2. | 1, 2 or 3 |
+| 3 | D | ASSET_TYPE_ID | M | COLLATERAL `Property Type` (never blank); required details override | Mapping in §8.7. For `PLOT` (35 collaterals), use title report item 2 "Nature of immovable property" to choose: `Residential` → 1, `Commercial` (also the typo `Commerical`) → 2; otherwise left blank and asked for (no type assumed). | 1, 2 or 3 |
 | 4 | E | ASSET_TYPE_OTHERS | C | Derived from `Property Type`; required details override | Only when the type is 3, e.g. `Industrial`, `Mixed Usage` | ≤ 50, restricted chars |
 | 5 | F | ASSET_SUB_TYPE_ID | M | Unit keywords in the LMS address (§8.7); else the unit word in title report item 1; required details override | Flat/shop/office/unit in a building → "Structure without Land" (2 / 5 / 8); independent house → "with Land" (1 / 4 / 7); plot → "Land without Structure" (3 / 6 / 19). e.g. an office in a building (Commercial) = `5` | Must belong to ASSET_TYPE_ID |
 | 6 | G | ASSET_UNIQUE_ID | O | COLLATERAL `Global collateral No` (proposed) | e.g. `CMS00260877`, or blank. **The demo omits this column entirely.** | Rule is "**" (undefined); keep it alphanumeric |
@@ -602,7 +602,7 @@ Step 1 generates `Output data/<batch>/2 Required details_<batch>.xlsx` for each 
 - A value typed in **Borrowers** applies to every SI of that application.
 - **Check and correct** shows, side by side: LMS value, title-report value, value the tool will use. It lists LMS / title report differences that matter (owners, unit number, floor, survey and plot numbers, area beyond 10%, property type, PIN, district), held title reports (answer `PDF OK` / `WRONG PDF`), the owner decisions the tool made on its own (owner lists that differ, owners taken or added from the title report, COLLATERAL shares that do not add up, an Owner Name cell taken as two people, and owner names that only resemble a borrower's, where an optional Y / N changes the decision), third-party mortgages, and needed values that have no column elsewhere. About 30 empty rows at the bottom let a reviewer correct any other field (Collateral ID, row, Neo CIF ID for BOR rows, field, value). Values here are applied last, so they win.
 - Code fields offer drop-downs showing `code - name`; city and district can be typed as a name or a code; dates as `YYYY-MM-DD` or `DD-MM-YYYY`; owners separated by `;`. Typing `BLANK` leaves an optional value empty.
-- Colours: yellow = needed, amber = default used, grey = found, orange = LMS and title report disagree, blue = typed earlier, dark grey = does not apply.
+- Colours: yellow = needed (the tool never assumes a value it cannot find), grey = found, orange = LMS and title report disagree, blue = typed earlier, dark grey = does not apply.
 - Settings that were planned for a `Config` sheet (entity code, file-name segment, charge-holder row, defaults) live in `cersai_tool/settings.py` and `cersai_tool/rows/chg_row.py`.
 
 ### 9.4 Reducing manual work permanently (LMS SQL changes)

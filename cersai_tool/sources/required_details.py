@@ -19,8 +19,8 @@ Sheets
   Lists              (hidden) the choices offered by the drop-downs.
 
 Cells to fill are yellow and empty. Grey cells show the value the tool found:
-leave them, or type over them to correct the value. Amber cells show a default
-the tool used. Blue cells hold values typed for the same collateral or
+leave them, or type over them to correct the value. The tool never assumes a
+value it cannot find: it asks. Blue cells hold values typed for the same collateral or
 borrower in an earlier batch. Typing BLANK leaves an optional value empty.
 
 Reading: a value counts as typed when it differs from what the tool found on
@@ -37,7 +37,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..context import PDF_OK, WRONG_PDF
-from ..model import (BLANK, BORROWER_KEY_OF_FIELD, CLEAR_WORD, CONFLICT, DEFAULT, INVALID, MISSING, NA,
+from ..model import (BLANK, BORROWER_KEY_OF_FIELD, CLEAR_WORD, CONFLICT, INVALID, MISSING, NA,
                      NEEDS_INPUT, SRC_MANUAL, Overrides, is_clear)
 from ..rows import bor_row, imm_row, si_row
 from ..rules.owners import normalise_name
@@ -98,9 +98,8 @@ CHECK_HEADERS = ["Collateral ID", "Application number", "Borrower Neo CIF ID", "
 EMPTY_CHECK_ROWS = 30
 
 FILL_NEEDED = "FFFFFF00"     # yellow
-FILL_DEFAULT = "FFFFC000"    # amber
 FILL_FOUND = "FFE7E6E6"      # grey
-FILL_CONFLICT = "FFF4B084"   # orange
+FILL_CONFLICT = "FFFF9900"   # orange (the same as in the working and final Excel)
 FILL_TYPED = "FF9BC2E6"      # blue
 FILL_NA = "FFA6A6A6"         # dark grey
 FILL_HEADER = "FFD9D9D9"
@@ -175,8 +174,6 @@ def _style(cell, typed_before) -> str:
         return FILL_TYPED
     if cell is None:
         return FILL_FOUND
-    if cell.status == DEFAULT:
-        return FILL_DEFAULT
     if cell.status == CONFLICT:
         return FILL_CONFLICT
     if cell.status == NA:
@@ -191,7 +188,7 @@ def _style(cell, typed_before) -> str:
 def _note(cell) -> str:
     if cell is None:
         return ""
-    status = {MISSING: "Needed", INVALID: "Invalid", DEFAULT: "Default used - confirm or type over it",
+    status = {MISSING: "Needed", INVALID: "Invalid",
               CONFLICT: "LMS and title report differ - see sheet Check and correct"}.get(cell.status, "")
     lines = [line for line in (status, cell.note, f"From: {cell.source}" if cell.source else "") if line]
     if cell.status == CONFLICT:
@@ -617,7 +614,6 @@ def _write_read_me(sheet, batch_name, counts):
         ("", False),
         ("Colours", True),
         ("  yellow, empty   needed: type the value", False),
-        ("  amber           a default the tool used: leave it to accept it, or type over it", False),
         ("  grey            found by the tool: leave it, or type over it to correct it", False),
         ("  orange          the LMS and the title report disagree (see Check and correct)", False),
         ("  blue            typed for the same collateral or borrower in an earlier batch", False),

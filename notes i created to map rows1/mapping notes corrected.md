@@ -173,7 +173,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - The two dates differ by 1–45 days in 30 applications. Confirm which one matches the mortgage date.
   - The title reports don't contain this date: they are written before disbursal.
 - **Column 10 - TOTAL_SECURED_AMOUNT** - sanctioned loan amount from any active row of this collateral. After the active-only filter it is the same on every row (checked: no collateral has two different values).
-  - If its active rows ever show two different sanctioned amounts, use the first and list the collateral for confirmation.
+  - If its active rows ever show two different sanctioned amounts, leave it blank and ask for it in the required-details file (no amount is assumed).
   - Digits only (max 13), greater than 0.
 - **Column 11 - ENTITY_MIS_TOKEN** - built from `Application number` + `Collateral ID`.
   - The maximum is **20 characters** (letters and digits only), and a plain concatenation is 24.
@@ -181,7 +181,7 @@ The counts quoted below come from the current LMS extract, active loans only. Th
   - Alternative: the Collateral ID alone (12 characters, already unique).
 - **Column 12 - NARRATION** - optional; blank by default. `NA` is technically allowed but carries no information. If something useful is wanted, put `LAN <Loan Account #>` (max 100).
 - **Column 13 - TYPE_OF_CHARGE** - `FIRST CHARGE` by default (letters and spaces only, max 20).
-  - 24 properties (same `Global collateral No`) secure two active loans and may need a second or pari passu charge: for these, `FIRST CHARGE` is shown as a default to confirm, and the required-details file can override it.
+  - 24 properties (same `Global collateral No`) secure two active loans and may need a second or pari passu charge: for these, TYPE_OF_CHARGE is left blank and asked for in the required-details file (no charge is assumed).
 - **Column 14 - IS_TPM** - `1` if Column 4 > 0 (some owner is not a borrower = third-party mortgage), otherwise `0`.
   - When it is 1, CERSAI also needs **ASO (asset owner) rows**, which are not in scope yet. These collaterals are left out of the `.DAT` file and listed, to be filed by hand.
 - **Column 15 - BATCH_REF_NUMBER** - optional. Either leave it blank, or write **exactly 20** letters and digits: `ARGF` + today `yyyymmdd` + last 8 digits of the Collateral ID, e.g. `ARGF2026090100266688`. Underscores and hyphens are not allowed.
@@ -201,7 +201,7 @@ Property values come from the input data first: COLLATERAL `Property Type`, `Pro
     - INDUSTRIAL → `3`
     - MIXED USAGE → `3`
     - PG → `1`
-    - PLOT → by the plot's use, from title report **item 2 "Nature of immovable property"**: `Residential` → `1`, `Commercial` (also spelt `Commerical`) → `2`; otherwise `3`, listed for confirmation.
+    - PLOT → by the plot's use, from title report **item 2 "Nature of immovable property"**: `Residential` → `1`, `Commercial` (also spelt `Commerical`) → `2`; otherwise (no usable title report, or another wording) it is left blank and asked for in the required-details file. The same for an unknown `Property Type`. No type is assumed.
 - **Column 4 - ASSET_TYPE_OTHERS** - **blank unless Column 3 = 3.** When it is 3, give a short description, e.g. `Industrial`, `Mixed Usage`, `Plot` (max 50).
 - **Column 5 - ASSET_SUB_TYPE_ID** - derive the sub-type from the unit word in the LMS address (or, when the address has none, in title report **item 1**):
   - Flat / Shop / Office / Unit / Gala in a building → "Structure without Land"
