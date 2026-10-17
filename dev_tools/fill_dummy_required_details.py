@@ -2,10 +2,10 @@
 
     python dev_tools/fill_dummy_required_details.py [batch name]
 
-For the dummy data only. Step 1 (run1 --dummy) asks for values that the
-extracts never have, above all every individual's gender and father's or
-mother's name, and for the values the hand-made test cases leave out on
-purpose. make_dummy_data.py writes what a person would type in
+For the dummy data only. Step 1 (run1 --dummy) asks for the values the
+hand-made test cases leave out of the extracts on purpose (a gender CKYC
+leaves blank, a PAN, a registration number...) and puts questions in the
+Check and correct sheet. make_dummy_data.py writes what a person would type in
 "Dummy input data/Dummy required details answers.xlsx"; this script types it
 into "2 Required details_<batch>.xlsx" of the latest dummy batch (or the
 batch named). Then run step 2 and step 3 with --dummy to get a complete .DAT

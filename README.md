@@ -152,8 +152,8 @@ The charge-holder (CHG) row is fixed in `cersai_tool/rows/chg_row.py`.
 
 `Dummy input data/` has the same layout as `Input data/`, with made-up people and companies covering
 the kinds of data found in the real extracts and title reports (`Dummy data cases.md` lists them).
-The dummy COLLATERAL has the hand-filled columns: filled for the generated records, blank for the
-hand-made cases (which test the usual sources).
+The dummy COLLATERAL has the hand-filled columns, filled for every collateral and every individual
+customer, as the team will fill them.
 After the hand-made cases come ordinary generated records, so that there are 304 collaterals in all:
 the `.DAT` file gets 300 SIs, because the 4 third-party mortgages among the hand-made cases are left out.
 Each one has its CKYC rows and a title report. All loans are active (Loan Status A). To change the size,
@@ -169,9 +169,9 @@ To make the complete `.DAT` file for the CERSAI approval submission, run these f
 .venv\Scripts\python.exe -m cersai_tool run3 --dummy
 ```
 
-The second command types into the required-details file what a person would type: every individual's
-father's / mother's name (never in CKYC), a gender CKYC leaves blank, and the values the hand-made test cases leave out on
-purpose. It takes them from `Dummy input data/Dummy required details answers.xlsx`. Step 3 then writes a
+The second command types into the required-details file what a person would type: the values the
+hand-made test cases leave out of the extracts on purpose (a gender CKYC leaves blank, a PAN, a
+registration number...) and the answers to the questions in Check and correct. It takes them from `Dummy input data/Dummy required details answers.xlsx`. Step 3 then writes a
 `.DAT` file with 300 SIs in `Dummy output data/<date>/`.
 
 To recreate the dummy data: `.venv\Scripts\python.exe dev_tools\make_dummy_data.py`.
