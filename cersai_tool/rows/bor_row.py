@@ -318,8 +318,12 @@ def col_15_individual_name(c, b, serial, row):
 
 
 # Column 16 - FATHER_MOTHER_NAME (individuals only; letters and spaces, max 50)
-# Not in CKYC or the title reports: always typed in the required-details file.
-# (The middle name is not used: it is sometimes "WO", i.e. "wife of".)
+# Where it comes from: COLLATERAL "Father Name", a column filled by hand, when
+#   the extract has it: the borrower's name on any row of the application.
+#   (Not in CKYC or the title reports. The middle name is not used: it is
+#   sometimes "WO", i.e. "wife of".)
+# If it can't be found: typed in the required-details file. When the
+#   borrower's rows give different names, none is used and it is asked for.
 def col_16_father_mother_name(c, b, serial, row):
     if not is_individual(row, b):
         return not_applicable("FATHER_MOTHER_NAME", "only for individuals")
@@ -327,7 +331,14 @@ def col_16_father_mother_name(c, b, serial, row):
     if typed is not None:
         name = clean(typed, "", 50, letters_only=True)
         return manual("FATHER_MOTHER_NAME", name) if name else invalid("FATHER_MOTHER_NAME", typed, "letters only")
-    return missing("FATHER_MOTHER_NAME", "not in CKYC: type the father's or mother's name")
+    column, problem = c.father_name(b)
+    if column:
+        name = clean(column, "", 50, letters_only=True)
+        if name:
+            return ok("FATHER_MOTHER_NAME", name, SRC_LMS, "COLLATERAL Father Name")
+        problem = f"COLLATERAL Father Name '{column}' has no letters"
+    return missing("FATHER_MOTHER_NAME", "not in CKYC or COLLATERAL (Father Name): type the father's or mother's "
+                                         "name" + (f". {problem}" if problem else ""))
 
 
 # Column 17 - DATE_OF_BIRTH (individuals only)

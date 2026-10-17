@@ -330,7 +330,7 @@ Key: **M** = mandatory, **O** = optional, **C** = conditional. "Col" is the colu
 | 3 | D | NUMBER_OF_BORROWERS | M | Derived (§6.2) | Count of BOR rows written | ≥ 1; equals the BOR line count |
 | 4 | E | NUMBER_OF_ASSET_OWNERS | M | Derived (§6.3) from COLLATERAL `Owner Name` (count checked with `Percentage Share` and `Ownership Status`), checked against title report item 4 (the report's owners are used only when COLLATERAL has none); required details override | Number of non-borrower owners; 0 if all owners are borrowers | ≥ 0; equals the ASO line count |
 | 5 | F | NUMBER_OF_CONSORTIUM_MEMBERS | M | Constant | `0` | |
-| 6 | G | SI_TYPE_ID | M | **Title report item 8 "Nature of Mortgage"** (§15.5); the required-details file overrides | `Equitable Mortgage` → `17` (all 4 demo reports). Blank, and asked for in the required-details file, when there is no usable title report (no default). | Must be in {17, 18, 19, 20, 21} |
+| 6 | G | SI_TYPE_ID | M | COLLATERAL `Type of Mortgage` (hand-filled column, when present); else **title report item 8 "Nature of Mortgage"** (§15.5); the required-details file overrides | `Equitable Mortgage` → `17` (all 4 demo reports). Blank, and asked for in the required-details file, when there is no usable title report (no default). | Must be in {17, 18, 19, 20, 21} |
 | 7 | H | SI_TYPE_OTHERS | C | Title report item 8 wording; required details override | Only when SI_TYPE_ID = 21 | ≤ 100, restricted chars |
 | 8 | I | FINANCING_TYPE_ID | M | Constant | `1` (Sole) | FINANCING_TYPE master |
 | 9 | J | SI_CREATION_DATE | M | CKYC `First Disbursal Date` | `DD-MM-YYYY` → `YYYY-MM-DD` (demo record: `2026-07-01`) | Not in the future, ≥ 1900. See §11 Q6 on whether the mortgage-deed date should be used instead. |
@@ -351,17 +351,17 @@ The LMS source listed first is used whenever it gives a usable value. "Title rep
 | 2 | C | ASSET_CATEGORY_ID | M | Constant | `1` (Immovable) | |
 | 3 | D | ASSET_TYPE_ID | M | COLLATERAL `Property Type` (never blank); required details override | Mapping in §8.7. For `PLOT` (35 collaterals), use title report item 2 "Nature of immovable property" to choose: `Residential` → 1, `Commercial` (also the typo `Commerical`) → 2; otherwise left blank and asked for (no type assumed). | 1, 2 or 3 |
 | 4 | E | ASSET_TYPE_OTHERS | C | Derived from `Property Type`; required details override | Only when the type is 3, e.g. `Industrial`, `Mixed Usage` | ≤ 50, restricted chars |
-| 5 | F | ASSET_SUB_TYPE_ID | M | Unit keywords in the LMS address (§8.7); else the unit word in title report item 1; required details override | Flat/shop/office/unit in a building → "Structure without Land" (2 / 5 / 8); independent house → "with Land" (1 / 4 / 7); plot → "Land without Structure" (3 / 6 / 19). e.g. an office in a building (Commercial) = `5` | Must belong to ASSET_TYPE_ID |
+| 5 | F | ASSET_SUB_TYPE_ID | M | COLLATERAL `Structure Type` (hand-filled column, when present); else required details. **Never guessed** from the address, the title report or Property Type (decided 2026-10-17: the unit words proved inaccurate) | "Structure with Land" (1 / 4 / 7), "Structure without Land" (2 / 5 / 8), "Land without Structure" (3 / 6 / 19), by asset type. e.g. an office in a building (Commercial) = `5` | Must belong to ASSET_TYPE_ID |
 | 6 | G | ASSET_UNIQUE_ID | O | COLLATERAL `Global collateral No` (proposed) | e.g. `CMS00260877`, or blank. **The demo omits this column entirely.** | Rule is "**" (undefined); keep it alphanumeric |
 | 7 | H | ASSET_DESCRIPTION | M | Built from the LMS parts (property type, unit, project); missing parts from title report item 1; required details override | `<type> <unit kind> <house no> <project>`, e.g. `COMMERCIAL UNIT 21 YASHODHAM BUSINESS CSL`; with no unit number, the plot number (`PLOT NO 45`); cut at a word boundary | ≤ 100, restricted chars |
-| 8 | I | SURVEY_NUMBER | C | Regex on the property `Full Address`; **title report item 1 when the address has none** (39% of active addresses have neither a survey nor a plot number); required details override | Numbers after `Survey No`, `S No`, `Sy No`, `CTS No`, `C.S. No`, `Khasra/Kh No`, `Gat No`, `Khata/Khewat No`, `Mustatil/Killa`, joined with `^`. If old and new survey numbers are both given, use the new one plus its Hissa (`12/2`). | ≤ 1000; separator question in §11 Q15 |
+| 8 | I | SURVEY_NUMBER | C | COLLATERAL `Survey No.` (hand-filled column, when present); else regex on the property `Full Address`; **title report item 1 when the address has none** (39% of active addresses have neither a survey nor a plot number); required details override | Numbers after `Survey No`, `S No`, `Sy No`, `CTS No`, `C.S. No`, `Khasra/Kh No`, `Gat No`, `Khata/Khewat No`, `Mustatil/Killa`, joined with `^`. If old and new survey numbers are both given, use the new one plus its Hissa (`12/2`). | ≤ 1000; separator question in §11 Q15 |
 | 9 | J | PLOT_NUMBER | C | Regex `Plot No` on the LMS address; else title report item 1 (`Plot No.`, or the `FP/PF No.` of a town-planning scheme); required details override | Leave blank rather than `NA` | ≤ 20; letters, digits, `- _ . /` and space |
 | 10 | K | ASSET_AREA | O | COLLATERAL `Carpert Area` (blank for 10 active collaterals); else title report item 1 (`adm./admeasuring <number> <unit> <area type>`); required details override | LMS area assumed to be sq ft (§11 Q19). A title-report area is used as the report states it (§11 Q26). | Decimal(7,2), so at most 99,999.99. One collateral exceeds this. |
 | 11 | L | ASSET_AREA_UNIT | C | Follows the area's source; required details override | `6` (Square Feet) with an LMS area. With a title-report area, the unit written next to it: `Sq. Mtrs.`/`sq.mtr` → `7`, `Sq. Ft.`/`Sq. Fts.` → `6`, `Sq. Yds.` → `8` (§15.5). | Required when ASSET_AREA is filled; AREA_UNIT master |
 | 12 | M | HOUSE_NUMBER | C | Regex on the LMS address (`Flat/Office/Unit/Shop/House/H/Gala/Galla/Row House/Bungalow/Door No`, also `House bearing No.` and `Property (bearing) No.`; about 60% have one); else the unit number in title report item 1; required details override | e.g. `21`, `13B`, `C-3002` | Required for sub-types 1, 2, 4, 5, 7, 8; also asked for when the sub-type is not known yet (except PLOT), so both are filled together *(implementation)*. ≤ 20; letters, digits, `- /` and space only (**no dot**). |
 | 13 | N | FLOOR_NUMBER | O | Regex `(\d+)(st\|nd\|rd\|th)? Floor` on the LMS address; else title report item 1; `Ground` → 0; `Basement`/`Lower Ground` → −1; required details override | e.g. `1` | Whole number from −3 to 100 |
 | 14 | O | BUILDING_NAME | O | Regex hints on the LMS address (`Wing`, `Tower`, `Building`, `Bldg`); else title report item 1 (`Building No. N known as …`, `Tower-N (name)`); required details override | Blank if unknown (not `NA`) | ≤ 50, restricted chars |
-| 15 | P | PROJECT_NAME | M | The LMS address segment after the house and floor segments; else **title report item 1** (`project known as …`, else `Society known as …`); required details override | e.g. `Yashodham Business CSL`, `Aaradhya Parkwood` | ≤ 50, restricted chars. For land or villages with no project, see §11. |
+| 15 | P | PROJECT_NAME | M | COLLATERAL `Project Name` (hand-filled column, when present); else the LMS address segment after the house and floor segments; else **title report item 1** (`project known as …`, else `Society known as …`); required details override | e.g. `Yashodham Business CSL`, `Aaradhya Parkwood` | ≤ 50, restricted chars. For land or villages with no project, see §11. |
 | 16 | Q | STREET_NAME | O | Regex on a segment containing `Road/Rd/Marg/Street/Lane/Path/Highway`; else title report item 1 when it names a road | e.g. `Aba Karmarkar Road`. **Never remove spaces** to make it fit (the demo did). | ≤ 50; letters, digits, `- /` and space only |
 | 17 | R | POCKET | O | Not in source | Blank | |
 | 18 | S | LOCALITY | M | LMS address segment(s) just before the city/state tail; else title report item 1 (a named area, or `Village <name>`); required details override | e.g. `Dindoshi Goregaon East Mumbai` | ≤ 50, restricted chars |
@@ -393,7 +393,7 @@ Fields 7–11 apply only to **non-individual** borrower types (everything except
 | 13 | N | INDIVIDUAL_CKYC_NUMBER | C | **Required details** | Individual only; needed when there is no PAN (5 cases) | Exactly 14 digits |
 | 14 | O | GENDER | C | CKYC `Gender` (`Male` → `M`, `Female` → `F`); required details when blank or the column is missing | `M`, `F` or `T` | GENDER master. **Don't guess from names.** |
 | 15 | P | INDIVIDUAL_NAME | C | CKYC `Customer Name`, falling back to First + Middle + Last | Remove dots and digits (e.g. `SARVES .` → `SARVES`) | Letters and spaces only; ≤ 50 |
-| 16 | Q | FATHER_MOTHER_NAME | C | **Required details** (not in the extract) | Don't build it from the middle name (the demo did) | Letters and spaces only; ≤ 50 |
+| 16 | Q | FATHER_MOTHER_NAME | C | COLLATERAL `Father Name` (hand-filled column, when present); else **required details** (not in the extract) | Don't build it from the middle name (the demo did) | Letters and spaces only; ≤ 50 |
 | 17 | R | DATE_OF_BIRTH | C | CKYC `Date Of Birth` | `DD-MON-YY` → `YYYY-MM-DD` using the century rule (§8.2) | Not in the future, ≥ 1900 |
 | 18 | S | MOBILE_NUMBER | O | CKYC `Mobile No` with `+91--` removed (fallback: COLLATERAL `PHONE_NUMBER`) | Individual only | Exactly 10 digits |
 | 19 | T | EMAIL | O | CKYC `Email ID`, trimmed | Individual only; leave blank if invalid | Letters, digits, `_ .`, one `@`, a dot after the `@`; ≤ 50. **Hyphens are not allowed.** |
@@ -542,7 +542,7 @@ A value counts as found only when its pattern matches cleanly; otherwise treat i
 
 **Property Type → ASSET_TYPE_ID / sub-type.** This is a *proposed default* that the business must confirm (§11 Q21); the required-details file always overrides it.
 
-| LMS `Property Type` | ASSET_TYPE_ID | ASSET_TYPE_OTHERS | Default sub-type rule |
+| LMS `Property Type` | ASSET_TYPE_ID | ASSET_TYPE_OTHERS | Usual sub-type (a guide for whoever fills it; not applied by the tool) |
 |---|---|---|---|
 | RESIDENTIAL (998) | 1 | — | Flat/apartment → 2 (without land); independent/row house/bungalow → 1 (with land) |
 | COMMERCIAL (201) | 2 | — | Office/shop/unit/gala in a building → 5; independent building → 4 |
@@ -551,7 +551,7 @@ A value counts as found only when its pattern matches cleanly; otherwise treat i
 | PLOT (35) | Depends on use: 1, 2 or 3 | If 3: `Plot` | Land without structure: 3, 6 or 19 |
 | PG (1) | 1 | — | 1 or 2 |
 
-The sub-type keywords come from the address. "Structure without Land" fits units in multi-storey buildings; "Structure with Land" fits independent structures; "Land without Structure" fits plots.
+"Structure without Land" fits units in multi-storey buildings; "Structure with Land" fits independent structures; "Land without Structure" fits plots. **The tool does not apply these rules** (decided 2026-10-17): working the sub-type out from the address words proved inaccurate, so it comes only from COLLATERAL `Structure Type` (hand-filled) or the required-details file.
 
 ---
 
@@ -568,7 +568,7 @@ The sub-type keywords come from the address. "Structure without Land" fits units
 | Survey/Plot No | IMM.SURVEY_NUMBER / IMM.PLOT_NUMBER | Per collateral | LMS address; title report item 1 when the address has neither (39% of active addresses) | Keep them as **two columns**: they are different fields with different rules. |
 | Asset Area | IMM.ASSET_AREA (+ ASSET_AREA_UNIT) | Per collateral | COLLATERAL `Carpert Area` (sq ft, to confirm); title report item 1, with its unit, when blank | Add an "Asset Area Unit" column for manual overrides (the unit is required whenever an area is given). |
 | Registration no | Probably BOR.BORROWER_REGISTRATION_NUMBER (the demo's BOR placeholder says "Registration Number") | **Per borrower**, not per SI | Only the **property deed's** registration number (title report item 5), not a borrower's CIN/LLPIN | If you meant the deed number, it can be read automatically; **confirm (§11 Q14).** |
-| asset_sub_type | IMM.ASSET_SUB_TYPE_ID | Per collateral | **Derived** from unit keywords in the LMS address, else the title report's item 1 wording (flat/shop in a building → without land) | Confirm the rule (§11 Q27). |
+| asset_sub_type | IMM.ASSET_SUB_TYPE_ID | Per collateral | COLLATERAL `Structure Type` (hand-filled column, when present); else typed in the required-details file. Never derived from the address or the title report (decided 2026-10-17). | — |
 
 ### 9.2 Missing from the draft (cannot be automated from the current extracts)
 
@@ -995,7 +995,7 @@ These rules turn a title-report value into a CERSAI value. Under the LMS-first r
 | SI.SI_TYPE_ID | Item 8 (always) | `Equitable` (also "mortgage by deposit of title deeds") → 17; `Registered` (also "simple" or "English" mortgage) → 18; `Agreement to create mortgage` → 19; `Conditional sale` → 20; anything else → 21, with the text in SI_TYPE_OTHERS | 17 · 17 · 17 · 17 |
 | SI.NUMBER_OF_ASSET_OWNERS, SI.IS_TPM, BOR.IS_ASSET_OWNER | Item 4 (fallback: header box), for every collateral with a title report | Split the owners (§15.4 rule 7) and compare them with COLLATERAL `Owner Name`; §6.3 decides which list is used. Match the owners used to this SI's borrowers: an owner who matches no borrower counts in NUMBER_OF_ASSET_OWNERS and makes IS_TPM = 1. | 2 · 1 · 3 · 3 owners |
 | IMM.ASSET_TYPE_ID | Item 2, only for `PLOT` properties | `Residential` → 1; `Commercial`/`Commerical` → 2 | 1 · 2 · 1 · 1 |
-| IMM.ASSET_SUB_TYPE_ID | Unit word in item 1 | Flat/shop/office/unit/gala → without land (2 / 5 / 8); house/bungalow/row house → with land (1 / 4 / 7); plot/land → land only (3 / 6 / 19) | 2 · 5 · 2 · 2 |
+| IMM.ASSET_SUB_TYPE_ID | Unit word in item 1 | **Not used any more** (decided 2026-10-17: guessing from the unit word was inaccurate; the sub-type comes from COLLATERAL `Structure Type` or the required-details file) | — |
 | IMM.ASSET_DESCRIPTION | Item 1 parts | `<unit type> <no> <floor> Floor <project>`, cleaned and cut at a word boundary (≤ 100) | e.g. `Shop 13B Ground Floor Devdaya Park Co-op Hsg Soc Ltd` (52 characters) |
 | IMM.SURVEY_NUMBER | Item 1 | The numbers after `Survey No./S. No./Sy. No./CTS No./C.S. No./Gat No./Khasra No.`, split on `,`, `&` and `and`, joined with `^` (Q15). If old and new survey numbers are both given, use the new number plus `/<Hissa>`. | `149/1/3^150/6^152/5` · `142A^179^180` · `12/2` · `12/2` |
 | IMM.PLOT_NUMBER | Item 1 | `Plot No.`, or the `FP/PF No.` of a town-planning scheme | — · `4` · — · — |

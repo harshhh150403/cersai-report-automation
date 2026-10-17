@@ -5,7 +5,9 @@ This file holds columns 1-17 (what the asset is). Columns 18-27 (where it is)
 are in imm_location.py.
 
 Property details come first from the LMS: COLLATERAL "Property Type",
-"Carpert Area", and the pieces read from the free-text "Full Address". The
+"Carpert Area", the hand-filled columns "Structure Type", "Survey No." and
+"Project Name" when the extract has them, and the pieces read from the
+free-text "Full Address". The
 title report (item 1 "Full Description of the property", item 2 "Nature of
 immovable property") is read only for what the LMS does not give. When both
 give a value and they disagree, the LMS value is used and the difference is
@@ -16,7 +18,7 @@ import re
 from .. import settings
 from ..model import (SRC_LMS, SRC_PDF, blank, conflict, derived, fixed, invalid, manual, missing,
                      not_applicable, ok)
-from ..rules.address import unit_structure
+from ..rules.address import SURVEY_KEYS
 from ..rules.text import DESCRIPTION, HOUSE, ORG_NAME, STREET, SURVEY, ADDRESS, as_text, clean, \
     normalise_for_compare
 
@@ -29,8 +31,9 @@ FIELDS = ["ROW_TYPE", "ASSET_CATEGORY_ID", "ASSET_TYPE_ID", "ASSET_TYPE_OTHERS",
 # LMS "Property Type" -> CERSAI ASSET_TYPE_ID (1 Residential, 2 Commercial, 3 Other)
 PROPERTY_TYPES = {"RESIDENTIAL": "1", "COMMERCIAL": "2", "INDUSTRIAL": "3", "MIXED USAGE": "3", "PG": "1"}
 OTHER_TYPE_TEXT = {"INDUSTRIAL": "Industrial", "MIXED USAGE": "Mixed Usage", "PLOT": "Plot"}
-STRUCTURE_NAMES = {"with_land": "Structure with Land", "without_land": "Structure without Land",
-                   "land": "Land without Structure"}
+# COLLATERAL "Structure Type" (letters only, lower case) -> the name in the ASSET_SUB_TYPE_ID master
+STRUCTURE_TYPES = {"structurewithland": "Structure with Land", "structurewithoutland": "Structure without Land",
+                   "landwithoutstructure": "Land without Structure", "unidentified": "Unidentified"}
 # sub-types that need a house / flat / unit number
 STRUCTURE_SUB_TYPES = {"1", "2", "4", "5", "7", "8"}
 # area units -> square feet, only for comparing the LMS and title-report areas
@@ -120,15 +123,18 @@ def col_04_asset_type_others(c, row):
 
 
 # Column 5 - ASSET_SUB_TYPE_ID
-# Where it comes from: the kind of unit named in the LMS address (or, if the
-#   address names none, in title report item 1):
-#     flat / apartment / office / shop / unit / gala -> Structure without Land
-#     house / bungalow / row house / villa           -> Structure with Land
-#     COLLATERAL Property Type PLOT                  -> Land without Structure
+# Where it comes from: COLLATERAL "Structure Type", a column filled by hand,
+#   when the extract has it and the cell is filled: "Structure with Land",
+#   "Structure without Land", "Land without Structure" (or "Unidentified"), or
+#   the code itself.
 # Rules: the code depends on the asset type (column 3), from the
 #   ASSET_SUB_TYPE_ID master: Residential 1/2/3, Commercial 4/5/6, Other 7/8/19.
-# If it can't be found: reported as missing. While the asset type is not known
-#   it is left blank: it is worked out once ASSET_TYPE_ID is typed.
+#   It is never guessed from the address, the title report or the property
+#   type: the unit words ("Flat", "Door No.", "Property bearing No.") proved
+#   unreliable. Other wording in the column is reported, not guessed at.
+# If it can't be found: left blank and asked for in the required-details file.
+#   When the column names a structure but the asset type is not known yet, the
+#   code is worked out once ASSET_TYPE_ID is typed.
 def col_05_asset_sub_type_id(c, row):
     asset_type = row["ASSET_TYPE_ID"].value
     allowed = c.masters.sub_types_for(asset_type)
@@ -138,24 +144,27 @@ def col_05_asset_sub_type_id(c, row):
         if code not in allowed:
             return invalid("ASSET_SUB_TYPE_ID", code, f"not a sub-type of asset type {asset_type}")
         return manual("ASSET_SUB_TYPE_ID", code)
+    column, problem = c.column("Structure Type")
+    if column:
+        name = STRUCTURE_TYPES.get(re.sub(r"[^a-z]", "", column.lower()), "")
+        understood = name or column in c.masters.asset_sub_types
+        if understood and not asset_type:
+            return blank("ASSET_SUB_TYPE_ID", f"worked out from COLLATERAL Structure Type '{column}' once the "
+                                              "asset type (ASSET_TYPE_ID) is typed")
+        code = c.masters.sub_type_id(asset_type, name) if name else (column if column in allowed else "")
+        if code:
+            return ok("ASSET_SUB_TYPE_ID", code, SRC_LMS, f"COLLATERAL Structure Type '{column}'")
+        problem = (f"COLLATERAL Structure Type '{column}' is not understood for asset type {asset_type} (write "
+                   "Structure with Land, Structure without Land or Land without Structure)" if understood else
+                   f"COLLATERAL Structure Type '{column}' is not understood (write Structure with Land, "
+                   "Structure without Land or Land without Structure)")
+        c.issue("warning", "COLLATERAL columns", problem)
+    why = f". {problem}" if problem else ""
     if not asset_type:
-        return blank("ASSET_SUB_TYPE_ID", "worked out once the asset type (ASSET_TYPE_ID) is typed")
-    source, why = SRC_LMS, ""
-    if c.bundle["property_type"] == "PLOT":
-        structure, why = "land", "COLLATERAL Property Type PLOT"
-    else:
-        kind = c.lms_address.get("unit_kind")
-        structure = unit_structure(kind)
-        why = f"'{kind}' in the LMS address" if structure else ""
-        if not structure and c.pdf.get("unit_kind"):
-            structure, source = unit_structure(c.pdf["unit_kind"]), SRC_PDF
-            why = f"'{c.pdf['unit_kind']}' in title report item 1"
-    if not structure:
-        return missing("ASSET_SUB_TYPE_ID", "the address does not say whether it is a flat, house or plot")
-    code = c.masters.sub_type_id(asset_type, STRUCTURE_NAMES[structure])
-    if not code:
-        return missing("ASSET_SUB_TYPE_ID", f"no sub-type '{STRUCTURE_NAMES[structure]}' for asset type {asset_type}")
-    return ok("ASSET_SUB_TYPE_ID", code, source, f"{STRUCTURE_NAMES[structure]} ({why})")
+        return missing("ASSET_SUB_TYPE_ID", f"type the asset type (ASSET_TYPE_ID) and the sub-type that goes "
+                                            f"with it{why}")
+    return missing("ASSET_SUB_TYPE_ID", "not in COLLATERAL (Structure Type): pick Structure with Land, Structure "
+                                        f"without Land or Land without Structure for asset type {asset_type}{why}")
 
 
 # Column 6 - ASSET_UNIQUE_ID
@@ -210,22 +219,35 @@ def col_07_asset_description(c, row):
 
 
 # Column 8 - SURVEY_NUMBER
-# Where it comes from: survey-type numbers in the LMS address (CTS No., Survey
+# Where it comes from: COLLATERAL "Survey No.", a column filled by hand, when
+#   the extract has it and the cell is filled (several numbers separated by
+#   commas, ";", "&" or "and"; a label such as "Survey No." in front is dropped
+#   and "Hissa No." becomes "/"). Otherwise survey-type numbers in the LMS address (CTS No., Survey
 #   No., S. No., Sy. No., C.S. No., Gat No., Khasra No., Khata/Khewat No.).
 #   If the address has none, the same numbers from title report item 1.
 # Rules: several numbers are joined with "^". When old and new survey numbers
 #   are both given, only the new one is used, with its Hissa ("12/2").
 #   When the LMS and the title report both give numbers and they differ, the
-#   LMS numbers are used and the difference is flagged.
+#   LMS numbers (column or address) are used and the difference is flagged.
 # If it can't be found: blank. Either this column or PLOT_NUMBER (column 9)
 #   must be filled; if both are empty, this column is reported as missing.
 def col_08_survey_number(c, row):
     typed = c.ov("SURVEY_NUMBER")
     if typed is not None:
         return manual("SURVEY_NUMBER", clean(typed, SURVEY, 1000))
-    lms_numbers = c.lms_address.get("survey_numbers") or []
     pdf_numbers = c.pdf.get("survey_numbers") or []
     sep = settings.SURVEY_SEPARATOR
+    column, _ = c.column("Survey No.")
+    numbers = survey_list(column) if column else []
+    if numbers:
+        value = clean(_joined(numbers, sep), SURVEY, 1000)
+        if pdf_numbers and not _same_numbers(numbers, pdf_numbers):
+            return conflict("SURVEY_NUMBER", value, SRC_LMS, value, _joined(pdf_numbers, sep),
+                            "COLLATERAL Survey No. and title report item 1 differ")
+        return ok("SURVEY_NUMBER", value, SRC_LMS, "COLLATERAL Survey No.")
+    if column:
+        c.issue("warning", "COLLATERAL columns", f"COLLATERAL Survey No. '{column}' has no survey number in it")
+    lms_numbers = c.lms_address.get("survey_numbers") or []
     if lms_numbers:
         value = clean(_joined(lms_numbers, sep), SURVEY, 1000)
         if pdf_numbers and not _same_numbers(lms_numbers, pdf_numbers):
@@ -235,6 +257,19 @@ def col_08_survey_number(c, row):
     if pdf_numbers:
         return ok("SURVEY_NUMBER", clean(_joined(pdf_numbers, sep), SURVEY, 1000), SRC_PDF, "title report item 1")
     return blank("SURVEY_NUMBER", "not in the LMS address or the title report")
+
+
+def survey_list(text):
+    """COLLATERAL "Survey No." -> the survey numbers: "Survey No. 149/1/3, 150/6
+    and 12 Hissa No. 2" -> ["149/1/3", "150/6", "12/2"]."""
+    text = re.sub(r"\s*,?\s*\bhissa\s*no\.?\s*", "/", as_text(text), flags=re.I)
+    out = []
+    for part in re.split(r"\s*(?:[,;&^]|\band\b)\s*", text, flags=re.I):
+        part = re.sub(rf"^(?:{SURVEY_KEYS})\s*[:.\-]?\s*", "", part.strip(), flags=re.I)
+        part = clean(part, SURVEY, 1000).strip("^")
+        if part and part not in out:
+            out.append(part)
+    return out
 
 
 # Column 9 - PLOT_NUMBER (max 20 characters)
@@ -409,7 +444,9 @@ def col_14_building_name(c, row):
 
 
 # Column 15 - PROJECT_NAME (mandatory; max 50 characters)
-# Where it comes from: the part of the LMS address naming the society,
+# Where it comes from: COLLATERAL "Project Name", a column filled by hand, when
+#   the extract has it and the cell is filled. Otherwise the part of the LMS
+#   address naming the society,
 #   project or complex (CHS, CHSL, Society, Apartments, Residency, Complex...).
 #   If absent, title report item 1: "project known as ..." first, otherwise
 #   "Society known as ...".
@@ -419,6 +456,12 @@ def col_15_project_name(c, row):
     typed = c.ov("PROJECT_NAME")
     if typed is not None:
         return manual("PROJECT_NAME", clean(typed, ORG_NAME, 50))
+    column, _ = c.column("Project Name")
+    if column:
+        name = clean(column, ORG_NAME, 50)
+        if name:
+            return ok("PROJECT_NAME", name, SRC_LMS, "COLLATERAL Project Name")
+        c.issue("warning", "COLLATERAL columns", f"COLLATERAL Project Name '{column}' has no letters or digits")
     if c.lms_address.get("project"):
         return ok("PROJECT_NAME", clean(c.lms_address["project"], ORG_NAME, 50), SRC_LMS, "from the LMS address")
     if c.pdf.get("project"):

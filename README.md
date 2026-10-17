@@ -23,7 +23,7 @@ The mapping rules behind every column are in
 | Folder / file                         | What goes there                                                                                                                           |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `Input data/CKYC/`                  | The day's CKYC extract: exactly one`.xlsx` file (any name). Its `Gender` column (`Male` / `Female`) is used when present.               |
-| `Input data/COLLATERAL/`            | The day's COLLATERAL extract: exactly one`.xlsx` file.                                                                                  |
+| `Input data/COLLATERAL/`            | The day's COLLATERAL extract: exactly one`.xlsx` file. It may have hand-filled columns (below).                                                              |
 | `Input data/Legal/`                 | Title reports named`<Application number>_<Collateral ID>.pdf`, e.g. `APPL00027326_COLL00266688.pdf`. PDFs from earlier days can stay. |
 | `Master data/CERSAI2.0_Masters.xls` | The CERSAI masters. Replace it when CERSAI publishes a new version.                                                                       |
 | `Output data/<date>/`               | One folder per batch (a second batch on the same day gets`_2`).                                                                         |
@@ -72,11 +72,36 @@ type another batch name such as `2026-09-30`.
 ## How values are chosen
 
 1. A value typed in the required-details file (or the final Excel) always wins.
-2. Otherwise CKYC / COLLATERAL.
+2. Otherwise CKYC / COLLATERAL, including the hand-filled columns below when the file has them.
 3. Otherwise the title report, only for what the LMS lacks (survey or plot number, area, project,
-   PIN...). The type of mortgage (SI type) is only in the title report.
-4. Otherwise the value is asked for in the required-details file. This includes the type of mortgage
-   (SI type) when there is no usable title report: no type is assumed.
+   PIN...). Without the hand-filled columns, the type of mortgage (SI type) is only in the title report.
+4. Otherwise the value is asked for in the required-details file. Nothing is assumed or guessed: no
+   type of mortgage when there is no usable title report, and the asset sub-type (structure with or
+   without land, land without structure) is never worked out from the address.
+
+### Hand-filled COLLATERAL columns
+
+Someone may add these columns to the COLLATERAL extract and fill them by hand. Each is read only
+when the file has it (step 1 lists the ones it found); a missing column or a blank cell leaves the
+value to the usual sources above. The names are matched ignoring case, spaces and punctuation.
+
+| Column | Fills | Write it as |
+|---|---|---|
+| `Father Name` | FATHER_MOTHER_NAME of an individual borrower | The name, on that customer's rows (any collateral of the application). |
+| `Type of Mortgage` | SI_TYPE_ID | `Equitable Mortgage`, `Registered Mortgage`, `Agreement to Create Mortgage`, `Conditional Sale`, or `Other: <description>` (a code 17-21 also works). |
+| `Structure Type` | ASSET_SUB_TYPE_ID | `Structure with Land`, `Structure without Land` or `Land without Structure`. The code follows from the asset type (Property Type). |
+| `Survey No.` | SURVEY_NUMBER | Several numbers separated by commas; a Hissa as `12/2`. |
+| `Project Name` | PROJECT_NAME | The society, project or scheme name. |
+
+- A value may be on one row of the collateral (or of the customer, for `Father Name`) or on all of
+  them: blank rows are ignored. If its rows give different values, none is used and the difference
+  is reported.
+- `NA`, `-` and similar are treated as blank.
+- When a column and the title report disagree (type of mortgage, survey numbers), the column's value
+  is used and the difference is shown in Check and correct.
+- Wording the tool does not recognise (for example `EM`, or `Flat` as a structure type) is not
+  guessed at: it is reported in the Issues sheet, and the value comes from the usual sources or is
+  asked for.
 
 Property owners come from COLLATERAL (`Owner Name`) too. Their `Percentage Share` should add up to 100%
 and `Ownership Status` should match the number of owners (Single = one, Joint = more). The title report
@@ -126,6 +151,8 @@ The charge-holder (CHG) row is fixed in `cersai_tool/rows/chg_row.py`.
 
 `Dummy input data/` has the same layout as `Input data/`, with made-up people and companies covering
 the kinds of data found in the real extracts and title reports (`Dummy data cases.md` lists them).
+The dummy COLLATERAL has the hand-filled columns: filled for the generated records, blank for the
+hand-made cases (which test the usual sources).
 After the hand-made cases come ordinary generated records, so that there are 304 collaterals in all:
 the `.DAT` file gets 300 SIs, because the 4 third-party mortgages among the hand-made cases are left out.
 Each one has its CKYC rows and a title report. All loans are active (Loan Status A). To change the size,

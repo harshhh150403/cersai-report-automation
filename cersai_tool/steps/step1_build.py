@@ -98,6 +98,14 @@ def run(paths, log=print, today=None):
     applications = len({b["application_number"] for b in bundles})
     log(f"  {len(bundles)} active collateral(s) of {applications} application(s) in "
         f"{Path(info['collateral_file']).name}")
+    found = info["optional_columns"]["COLLATERAL"]
+    if found:
+        absent = [name for name in lms.COLLATERAL_OPTIONAL_COLUMNS if name not in found]
+        log(f"  hand-filled COLLATERAL columns used: {', '.join(found)}"
+            + (f" (not in the file: {', '.join(absent)})" if absent else ""))
+    else:
+        log(f"  no hand-filled COLLATERAL columns ({', '.join(lms.COLLATERAL_OPTIONAL_COLUMNS)}): "
+            "the usual sources are used")
     for note in notes:
         log(f"  note: {note}")
 

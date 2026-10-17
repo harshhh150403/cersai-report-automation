@@ -107,16 +107,22 @@ def col_05_number_of_consortium_members(c, row):
 
 
 # Column 6 - SI_TYPE_ID (type of mortgage)
-# Where it comes from: the title report, item 8 "Nature of Mortgage". The LMS
-#   files do not hold the type of mortgage, so the title report is always used.
+# Where it comes from: COLLATERAL "Type of Mortgage", a column filled by hand,
+#   when the extract has it and the cell is filled. Otherwise the title report,
+#   item 8 "Nature of Mortgage" (the LMS itself does not hold the type).
 # Rules: the words are turned into the CERSAI code (SI_SUB_TYPE_ID master,
-#   immovable rows only): Equitable -> 17, Registered -> 18, Agreement to create
-#   mortgage -> 19, Conditional sale -> 20, anything else -> 21 (Other).
-#   Never read from the report's "Final Certificate", which one law firm
-#   strikes out while a search is pending.
-# If it can't be found: no usable title report or no item 8 -> left blank and
-#   asked for in the required-details file (it is mandatory, so the SI stays out
-#   of the .DAT file until it is typed). No type of mortgage is assumed.
+#   immovable rows only): Equitable (also "deposit of title deeds") -> 17,
+#   Registered -> 18, Agreement to create mortgage -> 19, Conditional sale -> 20.
+#   The column may also hold the code itself (17-21), or "Other: <description>"
+#   for 21 (Other). Any other wording in the column is not guessed at: it is
+#   reported and the title report is used. In the title report, other wording
+#   -> 21 (Other). When the column and the title report give different types,
+#   the column's is used and the difference is flagged. Never read from the
+#   report's "Final Certificate", which one law firm strikes out while a search
+#   is pending.
+# If it can't be found: left blank and asked for in the required-details file
+#   (it is mandatory, so the SI stays out of the .DAT file until it is typed).
+#   No type of mortgage is assumed.
 def col_06_si_type_id(c, row):
     typed = c.ov("SI_TYPE_ID")
     if typed is not None:
@@ -126,16 +132,50 @@ def col_06_si_type_id(c, row):
         return manual("SI_TYPE_ID", code)
     report = c.report
     text = report.get("mortgage_text", "") if report else ""
-    code = mortgage_type_id(text)
-    if code:
-        return ok("SI_TYPE_ID", code, SRC_PDF, f"title report item 8: '{text}'")
+    pdf_code = mortgage_type_id(text)
+    column, problem = c.column("Type of Mortgage")
+    if column:
+        code, _ = column_mortgage(column)
+        if code in c.masters.immovable_si_types:
+            if pdf_code and pdf_code != code:
+                return conflict("SI_TYPE_ID", code, SRC_LMS, f"{code} ({column})", f"{pdf_code} ({text})",
+                                "COLLATERAL Type of Mortgage and title report item 8 differ")
+            return ok("SI_TYPE_ID", code, SRC_LMS, f"COLLATERAL Type of Mortgage '{column}'")
+        problem = (f"COLLATERAL Type of Mortgage '{column}' is not understood (write Equitable Mortgage, "
+                   "Registered Mortgage, Agreement to Create Mortgage, Conditional Sale or Other: <description>)")
+        c.issue("warning", "COLLATERAL columns", problem)
+    if pdf_code:
+        return ok("SI_TYPE_ID", pdf_code, SRC_PDF, f"title report item 8: '{text}'")
     why = "no usable title report" if not report else "title report item 8 not found"
-    return missing("SI_TYPE_ID", f"{why}: type the type of mortgage (17 Equitable, 18 Registered, ...)")
+    return missing("SI_TYPE_ID", f"{why}: type the type of mortgage (17 Equitable, 18 Registered, ...)"
+                                 + (f". {problem}" if problem else ""))
+
+
+def column_mortgage(text):
+    """COLLATERAL "Type of Mortgage" -> (code, description for 21 Other), or
+    ("", "") when it is not understood. Accepts a code ("17", also "17 -
+    Equitable Mortgage"), "Other: <description>", or the name of a type."""
+    text = " ".join(as_text(text).split())
+    m = re.match(r"(1[7-9]|2[01])\b[\s\-:.]*(.*)$", text)
+    if m:
+        code, rest = m.groups()
+        return code, (_other_text(rest) if code == "21" else "")
+    if re.match(r"others?\b", text, re.I):
+        return "21", _other_text(text)
+    code = mortgage_type_id(text)
+    return (code, "") if code in ("17", "18", "19", "20") else ("", "")
+
+
+def _other_text(text):
+    """'Other: Usufructuary Mortgage' -> 'Usufructuary Mortgage'."""
+    return re.sub(r"^others?\b[\s\-:.,]*", "", text.strip(), flags=re.I).strip()
 
 
 # Column 7 - SI_TYPE_OTHERS
 # Only used when column 6 is 21 (Other): a short description of the mortgage.
-# Where it comes from: the wording of title report item 8.
+# Where it comes from: the description in COLLATERAL "Type of Mortgage" ("Other:
+#   <description>") when column 6 came from it; otherwise the wording of title
+#   report item 8.
 # If it can't be found: reported as missing (it is mandatory when column 6 is 21).
 def col_07_si_type_others(c, row):
     if row["SI_TYPE_ID"].value != "21":
@@ -143,6 +183,11 @@ def col_07_si_type_others(c, row):
     typed = c.ov("SI_TYPE_OTHERS")
     if typed is not None:
         return manual("SI_TYPE_OTHERS", clean(typed, DESCRIPTION, 100))
+    column, _ = c.column("Type of Mortgage")
+    if column and row["SI_TYPE_ID"].source == SRC_LMS:
+        description = clean(column_mortgage(column)[1], DESCRIPTION, 100)
+        if description:
+            return ok("SI_TYPE_OTHERS", description, SRC_LMS, "COLLATERAL Type of Mortgage")
     text = c.report.get("mortgage_text", "") if c.report else ""
     if text:
         return ok("SI_TYPE_OTHERS", clean(text, DESCRIPTION, 100), SRC_PDF, "title report item 8")

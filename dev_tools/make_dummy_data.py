@@ -24,7 +24,8 @@ PIN codes and place names are real, because the tool looks them up in the
 CERSAI masters. The files copy the layout of the real LMS extracts: the same
 sheets ("Export Worksheet" and "SQL"), columns, and value formats (DD-MM-YYYY
 and DD-MON-YY dates, "+91--" mobiles, numbers stored as numbers). CKYC also
-has the Gender column (Male / Female) that the CKYC table provides. Rows are
+has the Gender column (Male / Female) that the CKYC table provides, and
+COLLATERAL the columns someone fills by hand (HAND_FILLED_COLUMNS). Rows are
 built the way the LMS queries build them: CKYC has one row per customer x ID
 document x address; COLLATERAL has one row per loan account x customer x
 owner x customer address.
@@ -57,6 +58,10 @@ COLL_HEADERS = ["Application number", "Loan Account #", "Loan Status", "Disbursa
                 "Property Pincode", "FOIR(%)", "Type of loan eligibility program", "Build up Area", "Carpert Area",
                 "Age of Property (In Years)", "Market Value", "Sanctioned Loan Amount", "Disbursed Loan Amount",
                 "PHONE_NUMBER", "EMAIL_ADDRESS", "Identification Number", "ADDRESS_TYPE", "Customer Address"]
+# columns someone adds to COLLATERAL and fills by hand (the tool reads them when present): filled for the
+# generated records, blank for the hand-made cases, which test the usual sources
+HAND_FILLED_COLUMNS = ["Father Name", "Type of Mortgage", "Structure Type", "Survey No.", "Project Name"]
+COLL_HEADERS += HAND_FILLED_COLUMNS
 MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 
 
@@ -150,14 +155,15 @@ def loan(number, status, date, sanctioned, disbursed=None):
 
 def collateral(coll, cms, ptype, address, pin, owners, *, built=None, carpet=None, classification="Others",
                nature="FREEHOLD", purpose="Self Occupied", ownership="Others", age=None, market=None, pdf=None,
-               status=None):
+               status=None, columns=None):
     """owners: [(name as typed in the LMS, percentage share)]; pdf: a title-report spec or None;
-    status: the Ownership Status (default Single for one owner, Joint for more)."""
+    status: the Ownership Status (default Single for one owner, Joint for more); columns: the
+    hand-filled COLLATERAL columns of the collateral ({column: value})."""
     return {"coll": coll, "cms": cms, "ptype": ptype, "address": address, "pin": pin, "owners": owners,
             "built": built, "carpet": carpet, "classification": classification, "nature": nature,
             "purpose": purpose, "ownership": ownership, "age": (0 if ptype == "PLOT" else 8) if age is None else age,
             "market": market, "pdf": pdf,
-            "status": status}
+            "status": status, "columns": columns or {}}
 
 
 def application(app, branch, first_disbursal, customers, collaterals, loans, *, received="15-MAY-26",
@@ -276,8 +282,8 @@ def build_applications():
                     "Road, Shivaganga Layout, Goraguntepalya, Yeshwanthpur Hobli, Bangalore North Taluk, Bangalore, "
                     "Karnataka- 560022, India", "560022", [("N Lokesh", 100)], built=1450, carpet=1200)],
         [loan(900301, "A", "22-JUL-26", 6500000)],
-        case="Bangalore BBMP address (Katha, EPID, Ward, Hobli, Taluk): house number found, but not whether it is "
-             "a flat or a house; no survey/plot number; no title report (SI type typed by hand, owners not verified); "
+        case="Bangalore BBMP address (Katha, EPID, Ward, Hobli, Taluk): house number found; "
+             "no survey/plot number; no title report (SI type typed by hand, owners not verified); "
              "proprietorship with only GST/Udyam/Shop numbers (no PAN, so a CKYC number is needed); Last Name ' '; "
              "e-mail with a hyphen (not allowed by CERSAI)."))
 
@@ -334,7 +340,7 @@ def build_applications():
                                "302 017.", nature="Residential Plot.", initiated="10/06/2026", issued="15/06/2026"))],
         [loan(900501, "A", "26-JUN-26", 3000000)],
         case="Property type PLOT: residential or commercial is taken from title report item 2 ('Residential Plot' -> "
-             "1, land without structure -> 3); a guarantor (not a borrower, so no BOR row); an all-lower-case "
+             "1); a guarantor (not a borrower, so no BOR row); an all-lower-case "
              "name; no project name anywhere (typed by hand)."))
 
     # D06 - PLOT with no title report; proprietorship tagged 'individual'.
@@ -461,8 +467,8 @@ def build_applications():
                                "Village Dumbhal, Taluka Choryasi, District Surat", nature="Commercial",
                                mortgage="Mortgage by deposit of title deeds"))],
         [loan(901001, "A", "21-AUG-26", 3500000)],
-        case="Gujarat T.P. scheme and final plot numbers (34/35) in both sources; shop (commercial, structure "
-             "without land); the proprietorship's office address body is in Mumbai but ends with Surat (data "
+        case="Gujarat T.P. scheme and final plot numbers (34/35) in both sources; shop (commercial); the "
+             "proprietorship's office address body is in Mumbai but ends with Surat (data "
              "quality: the ending decides city/PIN); 'Mortgage by deposit of title deeds' = equitable (17)."))
 
     # D11 - LLP (no LLPIN in CKYC); Door No.; usufructuary mortgage (SI type 21).
@@ -485,8 +491,7 @@ def build_applications():
                                "situated at 2nd Street, Anna Nagar East, Chennai 600 040.", nature="Commerical.",
                                mortgage="Usufructuary Mortgage"))],
         [loan(901101, "A", "30-JUL-26", 4000000)],
-        case="LLP with no LLPIN in CKYC (registration number needed); Tamil Nadu 'Door No.' (kind of unit "
-             "unknown); owner initial written first in the title report ('R. Senthil Kumar'); 'Commerical' typo; "
+        case="LLP with no LLPIN in CKYC (registration number needed); Tamil Nadu 'Door No.'; owner initial written first in the title report ('R. Senthil Kumar'); 'Commerical' typo; "
              "'Usufructuary Mortgage' -> SI type 21 with SI_TYPE_OTHERS."))
 
     # D12 - two flats in one collateral; four owners; guarantor; the two disbursal dates differ.
@@ -555,7 +560,7 @@ def build_applications():
                     "411027, India", "411027", [("Prakash Deshmukh", 100)], built=1100, carpet=950, purpose="Rented")],
         [loan(901301, "A", "11-SEP-26", 9000000)],
         case="Two collaterals on one application (the borrowers are listed once in the required-details file); "
-             "row house = structure with land; the title report's item 12 names fewer owners than item 4 "
+             "a row house; the title report's item 12 names fewer owners than item 4 "
              "(warning)."))
 
     # D14 + D15 - the same property (Global collateral No) secures two applications.
@@ -697,7 +702,7 @@ def build_applications():
         [loan(902301, "A", "12-AUG-26", 5500000)],
         case="The title report is a scan with no text: it is reported and not used (SI type typed by hand, owners not "
              "verified); a customer name with a dot ('RAKESH .') and no Gender in CKYC (typed in the "
-             "required-details file); house = structure with land."))
+             "required-details file)."))
 
     # D24 - industrial gala; LMS PIN not in the master; area conflict; two active loans.
     apps.append(application(
@@ -1100,6 +1105,19 @@ TYPED_SI_TYPES = {coll: "17" for coll in (
     "COLL00090022", "COLL00090024", "COLL00090025", "COLL00090026", "COLL00090028", "COLL00090029",
     "COLL00090030", "COLL00090031", "COLL00090036", "COLL00090039", "COLL00090041", "COLL00090042",
     "COLL00090043", "COLL00090045", "COLL00090046", "COLL00090047", "COLL00090049")}
+# The asset sub-type (ASSET_SUB_TYPE_ID): the tool takes it only from COLLATERAL
+# "Structure Type", which is blank for the hand-made cases, so it is asked for
+# (the cases that have it in COLLATERAL_ANSWERS are not repeated here)
+TYPED_SUB_TYPES = {
+    "COLL00090001": "5", "COLL00090002": "2", "COLL00090004": "1", "COLL00090033": "3", "COLL00090005": "3",
+    "COLL00090006": "19", "COLL00090007": "2", "COLL00090034": "5", "COLL00090008": "2", "COLL00090010": "5",
+    "COLL00090012": "2", "COLL00090035": "5", "COLL00090013": "1", "COLL00090014": "2", "COLL00090016": "5",
+    "COLL00090017": "5", "COLL00090021": "2", "COLL00090023": "2", "COLL00090024": "2", "COLL00090036": "2",
+    "COLL00090025": "2", "COLL00090026": "1", "COLL00090027": "8", "COLL00090028": "1", "COLL00090029": "2",
+    "COLL00090031": "1", "COLL00090032": "2", "COLL00090037": "2", "COLL00090038": "5", "COLL00090039": "2",
+    "COLL00090040": "8", "COLL00090041": "19", "COLL00090042": "2", "COLL00090043": "2", "COLL00090044": "1",
+    "COLL00090045": "5", "COLL00090046": "19", "COLL00090047": "19", "COLL00090048": "2",
+}
 # Answers in the Check and correct sheet: (Collateral ID, row, field, value, why)
 CHECK_ANSWERS = [
     ("COLL00090025", "SI", "PDF_CHECK", "WRONG PDF", "the report is about another property"),
@@ -1594,9 +1612,11 @@ def regular_application(rng, number, coll, room, used):
         n = next(numbers)
         # a separate generator for the parent's name, so the records stay as they were
         parent = family.parent_name(p, random.Random(f"{SEED}:{n}"))
-        entries.append((person(n, family.ckyc_name(p), ctype, mon_date(dob), p["pan"], ids=ids, email=email,
-                               addresses=[("ResidentialAddress", address)], risk=risk, gender=p["gender"],
-                               parent=parent, phone=f"55{n % 100000000:08d}", coll_email=email), p))
+        customer = person(n, family.ckyc_name(p), ctype, mon_date(dob), p["pan"], ids=ids, email=email,
+                          addresses=[("ResidentialAddress", address)], risk=risk, gender=p["gender"],
+                          parent=parent, phone=f"55{n % 100000000:08d}", coll_email=email)
+        customer["father_column"] = parent                 # COLLATERAL "Father Name", filled by hand
+        entries.append((customer, p))
 
     business, role, second = None, "", None
     if kind == "individual":
@@ -1710,6 +1730,12 @@ def regular_application(rng, number, coll, room, used):
                        else "Equitable Mortgage",
                        initiated=initiated.strftime("%d/%m/%Y"),
                        issued=(initiated + timedelta(days=rng.randint(2, 6))).strftime("%d/%m/%Y"))))
+        # the hand-filled COLLATERAL columns (the land number is a plot number where land is allotted in plots)
+        collaterals[-1]["columns"] = {
+            "Type of Mortgage": collaterals[-1]["pdf"]["mortgage"],
+            "Structure Type": "Structure with Land" if prop["kind"] == "house" else "Structure without Land",
+            "Survey No.": prop["land"] if place["label"] != "Plot No." else None,
+            "Project Name": prop["name"]}
         owned = " and ".join(title(o["name"]) if o is business else title(fam.full_name(o)) for o in owners)
         notes.append(f"{prop['kind']} owned by {owned}" + (" (50% each)" if len(owners) == 2 else ""))
 
@@ -1791,7 +1817,9 @@ def collateral_rows(apps):
                                 share, col["ptype"], col["classification"], col["nature"], col["address"], col["pin"],
                                 a["foir"], a["program"], col["built"], col["carpet"], col["age"],
                                 col["market"] or int(a["loans"][0]["sanctioned"] * 1.8), l["sanctioned"], l["disbursed"],
-                                c["phone"], c["coll_email"], c["pan"], address_type, address])
+                                c["phone"], c["coll_email"], c["pan"], address_type, address,
+                                c.get("father_column")]
+                                + [col["columns"].get(name) for name in HAND_FILLED_COLUMNS[1:]])
     return rows
 
 
@@ -1860,8 +1888,11 @@ def write_answers(apps, path):
             if values:
                 people.append([a["app"], c["cif"], c["name"]] + [values.get(k) for k in people_keys])
     places = book.create_sheet("Collaterals")
-    answers = {coll: dict(COLLATERAL_ANSWERS.get(coll, {}), **({"SI_TYPE_ID": code} if code else {}))
-               for coll in set(COLLATERAL_ANSWERS) | set(TYPED_SI_TYPES) for code in [TYPED_SI_TYPES.get(coll)]}
+    answers = {}
+    for source in (COLLATERAL_ANSWERS, {coll: {"SI_TYPE_ID": code} for coll, code in TYPED_SI_TYPES.items()},
+                   {coll: {"ASSET_SUB_TYPE_ID": code} for coll, code in TYPED_SUB_TYPES.items()}):
+        for coll, values in source.items():
+            answers.setdefault(coll, {}).update(values)
     place_keys = sorted({k for v in answers.values() for k in v})
     places.append(["Collateral ID", "Application number"] + place_keys)
     for a in apps:
@@ -2174,6 +2205,10 @@ def main():
              "but a Collateral ID belongs to one application only. Borrowers are per application; owners are per "
              "collateral and can be the same, different, or overlap between the collaterals of one application.", "",
              "Every loan is active (Loan Status A); there are no cancelled (X) or closed (C) loans.", "",
+             "COLLATERAL also has the columns someone fills by hand (Father Name, Type of Mortgage, Structure "
+             "Type, Survey No., Project Name). They are filled for the generated records and blank for the "
+             "hand-made cases, which test the usual sources: there the asset sub-type and the father's names are "
+             "typed in the required-details file (the tool never guesses the sub-type).", "",
              "`Dummy required details answers.xlsx` holds what a person would type in the required-details file "
              "(every individual's gender and father's / mother's name, and the values the hand-made cases leave "
              "out); `dev_tools/fill_dummy_required_details.py` types it in after step 1.", ""]

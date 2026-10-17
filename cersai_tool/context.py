@@ -120,6 +120,28 @@ class CollateralContext:
     def lms_address(self) -> dict:
         return self._cached("address", lambda: parse_property_address(self.bundle["property_address"]))
 
+    # -- the hand-filled COLLATERAL columns (sources/lms.py) -----------------
+    def column(self, name):
+        """(value, problem) of a hand-filled COLLATERAL column for this
+        collateral, e.g. column("Survey No."). ("", "") when the extract has no
+        such column or its cells are blank; when the collateral's rows give
+        different values, none is used and the problem is reported."""
+        return self._cached(f"column:{name}", lambda: self._single(
+            self.bundle.get("lms_columns", {}).get(name, []), f"COLLATERAL {name}", "rows of this collateral"))
+
+    def father_name(self, borrower):
+        """(value, problem) of COLLATERAL "Father Name" for this borrower, from
+        any row of the application."""
+        return self._cached(f"father:{borrower['neo_cif']}", lambda: self._single(
+            borrower.get("father_names", []), "COLLATERAL Father Name", f"rows of {borrower['name']}"))
+
+    def _single(self, values, label, where):
+        if len(values) <= 1:
+            return (values[0] if values else ""), ""
+        problem = f"{label} differs between the {where} ({'; '.join(values)}), so it is not used"
+        self.issue("warning", "COLLATERAL columns", problem)
+        return "", problem
+
     @property
     def candidate_report(self):
         """The title report to check: None when there is none, it has no

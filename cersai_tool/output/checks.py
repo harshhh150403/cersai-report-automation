@@ -203,6 +203,8 @@ EMPTY_MESSAGES = {
                               "typed in the required-details file. Run step 2 again after",
     ("IMM", "ASSET_TYPE_ID"): "is empty: the asset type could not be worked out. Type it (ASSET_TYPE_ID) in the "
                               "required-details file and run step 2 again",
+    ("IMM", "ASSET_SUB_TYPE_ID"): "is empty: fill COLLATERAL Structure Type, or type the sub-type (ASSET_SUB_TYPE_ID) "
+                                  "in the required-details file, and run step 2 again",
 }
 
 

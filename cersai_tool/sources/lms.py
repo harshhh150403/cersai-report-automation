@@ -11,7 +11,13 @@ An application can have several collaterals, but a collateral belongs to one
 application only. Borrowers are per application (the same on each of its
 collaterals); owners are per collateral (they can differ between the
 collaterals of one application).
+
+COLLATERAL may also have columns that someone adds and fills by hand (Father
+Name, Type of Mortgage, Structure Type, Survey No., Project Name). They are
+read only when present; a missing column or a blank cell leaves the value to
+the usual sources.
 """
+import re
 from collections import OrderedDict
 from pathlib import Path
 
@@ -26,7 +32,18 @@ CKYC_COLUMNS = ["First Disbursal Date", "Application Number", "Loan Account No",
                 "Incorporation Date", "First Name", "Middle Name", "Last Name", "Identification Type",
                 "Identification Number", "Mobile No", "Email ID", "Full Address"]
 # read when the extract has them (older CKYC extracts have no Gender column)
-CKYC_OPTIONAL_COLUMNS = ["Gender"]
+CKYC_OPTIONAL_COLUMNS = {"Gender": []}
+# columns someone may add to COLLATERAL and fill by hand: {name: other names it
+# is recognised under}. Names are matched ignoring case, spaces and punctuation.
+COLLATERAL_OPTIONAL_COLUMNS = {
+    "Father Name": ["Father's Name", "Father/Mother Name", "Father or Mother Name"],
+    "Type of Mortgage": ["Mortgage Type"],
+    "Structure Type": ["Type of Structure", "Type of Property"],
+    "Survey No.": ["Survey Number", "Survey Nos."],
+    "Project Name": [],
+}
+# what a person may write in such a cell to mean "nothing"
+PLACEHOLDERS = {"NA", "N/A", "N A", "NIL", "NULL", "NONE", "-", "--", "0", "NOT APPLICABLE", "NOT AVAILABLE"}
 COLLATERAL_COLUMNS = ["Application number", "Loan Account #", "Loan Status", "Disbursal Date",
                       "Customer Name", "Customer Type", "Neo CIF ID", "Collateral ID",
                       "Global collateral No", "Owner Name", "Property Type", "Full Address",
@@ -49,9 +66,15 @@ def find_single_xlsx(folder: Path) -> Path:
     return files[0]
 
 
-def read_export(path: Path, required: list, optional=()) -> pd.DataFrame:
-    """The data sheet, every value as text. Optional columns are matched
-    whatever their case, and are empty when the file does not have them."""
+def _column_key(name) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+
+def read_export(path: Path, required: list, optional=None):
+    """The data sheet, every value as text, and the optional columns found.
+    optional: {name: [other names]}. An optional column is matched under any
+    of its names, ignoring case, spaces and punctuation, and renamed to its
+    name; when the file does not have it, it is added empty."""
     book = pd.ExcelFile(path)
     sheet = "Export Worksheet" if "Export Worksheet" in book.sheet_names else book.sheet_names[0]
     df = pd.read_excel(book, sheet_name=sheet, dtype=str)
@@ -59,13 +82,17 @@ def read_export(path: Path, required: list, optional=()) -> pd.DataFrame:
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise InputError(f"{path.name} is missing columns: {', '.join(missing)}")
-    for name in optional:
-        found = next((c for c in df.columns if c.lower() == name.lower()), None)
-        if found is None:
+    found = []
+    for name, others in (optional or {}).items():
+        keys = {_column_key(n) for n in [name] + others}
+        column = next((c for c in df.columns if _column_key(c) in keys), None)
+        if column is None:
             df[name] = ""
-        elif found != name:
-            df = df.rename(columns={found: name})
-    return df.map(as_text)
+            continue
+        found.append(name)
+        if column != name:
+            df = df.rename(columns={column: name})
+    return df.map(as_text), found
 
 
 def _first(values):
@@ -77,6 +104,22 @@ def _first(values):
 
 def _distinct(values):
     return list(OrderedDict.fromkeys(v for v in values if v))
+
+
+def _filled(rows: pd.DataFrame, column: str) -> list:
+    """The different values of a hand-filled optional column on these rows:
+    blanks and placeholders such as "NA" left out, and values that differ only
+    in case or spacing counted once (the first spelling is kept)."""
+    if column not in rows.columns:
+        return []
+    out = OrderedDict()
+    for value in rows[column]:
+        text = " ".join(as_text(value).split())
+        if not text or re.sub(r"\.$", "", text).upper() in PLACEHOLDERS:
+            continue
+        key = re.sub(r"\s*([^\w\s])\s*", r"\1", text.upper())
+        out.setdefault(key, text)
+    return list(out.values())
 
 
 def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
@@ -99,6 +142,7 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
     apps_by_property = active.groupby("Global collateral No")["Application number"].apply(
         lambda s: sorted(set(s))).to_dict()
 
+    active_by_app = {app: rows for app, rows in active.groupby("Application number")}
     bundles = []
     for coll_id, rows in active.groupby("Collateral ID", sort=False):
         if not coll_id:
@@ -117,7 +161,7 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
                 problems.append(f"active rows show more than one {label}: {', '.join(_distinct(rows[column]))}")
 
         app_ckyc = ckyc_by_app.get(app)
-        borrowers = _borrowers(app_ckyc, rows) if app_ckyc is not None else []
+        borrowers = _borrowers(app_ckyc, rows, active_by_app[app]) if app_ckyc is not None else []
         if app_ckyc is None:
             problems.append("no CKYC rows for this application")
 
@@ -144,6 +188,9 @@ def build_bundles(ckyc: pd.DataFrame, coll: pd.DataFrame):
             "borrowers": borrowers,
             "shared_with_applications": shared,
             "problems": problems,
+            # the hand-filled optional columns: their different values on this collateral's rows
+            "lms_columns": {name: _filled(rows, name)
+                            for name in COLLATERAL_OPTIONAL_COLUMNS if name != "Father Name"},
         })
     # the collaterals of one application next to each other
     bundles.sort(key=lambda b: (b["application_number"], b["collateral_id"]))
@@ -192,9 +239,12 @@ def _owners_with_shares(rows: pd.DataFrame):
     return owners, shares
 
 
-def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame) -> list:
+def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame, app_rows: pd.DataFrame) -> list:
     """One entry per customer (Neo CIF ID) of the application: primary first,
-    then co-applicants. Guarantors are included only if the setting says so."""
+    then co-applicants. Guarantors are included only if the setting says so.
+    coll_rows: this collateral's active COLLATERAL rows; app_rows: those of
+    every collateral of the application (a father's name typed on the rows of
+    one collateral serves them all)."""
     out = []
     for cif, rows in app_ckyc.groupby("Neo CIF ID", sort=False):
         customer_type = _first(rows["Customer Type"])
@@ -233,6 +283,7 @@ def _borrowers(app_ckyc: pd.DataFrame, coll_rows: pd.DataFrame) -> list:
             "collateral_phone": _first(mine["PHONE_NUMBER"]),
             "collateral_email": _first(mine["EMAIL_ADDRESS"]),
             "collateral_pan": _first(mine["Identification Number"]),
+            "father_names": _filled(app_rows[app_rows["Neo CIF ID"] == cif], "Father Name"),
         })
     order = {"primary": 0, "co-applicant": 1, "guarantor": 2}
     out.sort(key=lambda b: (order.get(b["customer_type"].lower(), 3), b["neo_cif"]))
@@ -244,9 +295,10 @@ def load_bundles(paths):
     (known: every Collateral ID in COLLATERAL -> its application)."""
     ckyc_file = find_single_xlsx(paths.ckyc_folder)
     coll_file = find_single_xlsx(paths.collateral_folder)
-    ckyc = read_export(ckyc_file, CKYC_COLUMNS, CKYC_OPTIONAL_COLUMNS)
-    coll = read_export(coll_file, COLLATERAL_COLUMNS)
+    ckyc, ckyc_found = read_export(ckyc_file, CKYC_COLUMNS, CKYC_OPTIONAL_COLUMNS)
+    coll, coll_found = read_export(coll_file, COLLATERAL_COLUMNS, COLLATERAL_OPTIONAL_COLUMNS)
     bundles, notes, known = build_bundles(ckyc, coll)
     info = {"ckyc_file": str(ckyc_file), "ckyc_rows": len(ckyc),
-            "collateral_file": str(coll_file), "collateral_rows": len(coll)}
+            "collateral_file": str(coll_file), "collateral_rows": len(coll),
+            "optional_columns": {"CKYC": ckyc_found, "COLLATERAL": coll_found}}
     return bundles, notes, info, known

@@ -13,15 +13,7 @@ from .text import as_text, straighten
 
 TAIL_RE = re.compile(r",\s*([^,]*?),\s*([^,]*?)\s*[-–]\s*(\d{6})\s*,\s*India\s*$", re.I)
 
-# Words that name the unit being mortgaged, and what kind of structure it is
-UNIT_KINDS = {
-    "flat": "without_land", "apartment": "without_land", "office": "without_land",
-    "unit": "without_land", "shop": "without_land", "gala": "without_land",
-    "galla": "without_land", "premises": "without_land",
-    "house": "with_land", "h": "with_land", "row house": "with_land",
-    "bungalow": "with_land", "villa": "with_land", "duplex": "with_land",
-    "property": "",   # "Property bearing No. ...": a number, but the structure is not stated
-}
+# Words that name the unit being mortgaged (followed by its number)
 _UNIT_WORDS = (r"row\s*house|flat|apartment|office|unit|shop|gall?a|premises|house|h|bungalow|villa|duplex|"
                r"door|property\s+bearing|property")
 _NUMBER = r"[A-Z]{0,3}\s?[-/]?\s?\d+[A-Z]?(?:\s?[-/]\s?[A-Z0-9]+)*"
@@ -119,11 +111,6 @@ def find_unit(text: str):
     for extra in re.findall(rf"(?:,|&|and|/)\s*(?:no\.?\s*)?({_NUMBER})", m.group(3) or "", re.I):
         numbers.append(_compact_number(extra))
     return kind, [n for n in numbers if n]
-
-
-def unit_structure(kind: str) -> str:
-    """'without_land', 'with_land' or '' for a unit keyword."""
-    return UNIT_KINDS.get((kind or "").lower(), "")
 
 
 _FLOOR_NAME = r"(?:upper ground|lower ground|ground|basement|stilt|first|second|third|fourth|fifth|\d{1,3}(?:st|nd|rd|th))"
