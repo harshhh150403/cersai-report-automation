@@ -77,7 +77,8 @@ type another batch name such as `2026-09-30`.
    PIN...). Without the hand-filled columns, the type of mortgage (SI type) is only in the title report.
 4. Otherwise the value is asked for in the required-details file. Nothing is assumed or guessed: no
    type of mortgage when there is no usable title report, and the asset sub-type (structure with or
-   without land, land without structure) is never worked out from the address.
+   without land) is never worked out from the address. Only a PLOT (COLLATERAL Property Type) is
+   taken as Land without Structure.
 
 ### Hand-filled COLLATERAL columns
 
@@ -89,7 +90,7 @@ value to the usual sources above. The names are matched ignoring case, spaces an
 |---|---|---|
 | `Father Name` | FATHER_MOTHER_NAME of an individual borrower | The name, on that customer's rows (any collateral of the application). |
 | `Type of Mortgage` | SI_TYPE_ID | `Equitable Mortgage`, `Registered Mortgage`, `Agreement to Create Mortgage`, `Conditional Sale`, or `Other: <description>` (a code 17-21 also works). |
-| `Structure Type` | ASSET_SUB_TYPE_ID | `Structure with Land`, `Structure without Land` or `Land without Structure`. The code follows from the asset type (Property Type). |
+| `Structure Type` | ASSET_SUB_TYPE_ID | `Structure with Land`, `Structure without Land` or `Land without Structure`. The code follows from the asset type (Property Type). When blank, a PLOT is Land without Structure and any other property is asked for. |
 | `Survey No.` | SURVEY_NUMBER | Several numbers separated by commas; a Hissa as `12/2`. |
 | `Project Name` | PROJECT_NAME | The society, project or scheme name. |
 

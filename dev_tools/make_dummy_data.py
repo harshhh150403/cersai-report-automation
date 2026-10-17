@@ -340,7 +340,7 @@ def build_applications():
                                "302 017.", nature="Residential Plot.", initiated="10/06/2026", issued="15/06/2026"))],
         [loan(900501, "A", "26-JUN-26", 3000000)],
         case="Property type PLOT: residential or commercial is taken from title report item 2 ('Residential Plot' -> "
-             "1); a guarantor (not a borrower, so no BOR row); an all-lower-case "
+             "1), and a plot is land without structure -> 3; a guarantor (not a borrower, so no BOR row); an all-lower-case "
              "name; no project name anywhere (typed by hand)."))
 
     # D06 - PLOT with no title report; proprietorship tagged 'individual'.
@@ -1105,18 +1105,18 @@ TYPED_SI_TYPES = {coll: "17" for coll in (
     "COLL00090022", "COLL00090024", "COLL00090025", "COLL00090026", "COLL00090028", "COLL00090029",
     "COLL00090030", "COLL00090031", "COLL00090036", "COLL00090039", "COLL00090041", "COLL00090042",
     "COLL00090043", "COLL00090045", "COLL00090046", "COLL00090047", "COLL00090049")}
-# The asset sub-type (ASSET_SUB_TYPE_ID): the tool takes it only from COLLATERAL
-# "Structure Type", which is blank for the hand-made cases, so it is asked for
-# (the cases that have it in COLLATERAL_ANSWERS are not repeated here)
+# The asset sub-type (ASSET_SUB_TYPE_ID): the tool takes it from COLLATERAL
+# "Structure Type", which is blank for the hand-made cases, or for a PLOT
+# (always land without structure); for the others it is asked for (the cases
+# that have it in COLLATERAL_ANSWERS are not repeated here)
 TYPED_SUB_TYPES = {
-    "COLL00090001": "5", "COLL00090002": "2", "COLL00090004": "1", "COLL00090033": "3", "COLL00090005": "3",
-    "COLL00090006": "19", "COLL00090007": "2", "COLL00090034": "5", "COLL00090008": "2", "COLL00090010": "5",
-    "COLL00090012": "2", "COLL00090035": "5", "COLL00090013": "1", "COLL00090014": "2", "COLL00090016": "5",
-    "COLL00090017": "5", "COLL00090021": "2", "COLL00090023": "2", "COLL00090024": "2", "COLL00090036": "2",
-    "COLL00090025": "2", "COLL00090026": "1", "COLL00090027": "8", "COLL00090028": "1", "COLL00090029": "2",
-    "COLL00090031": "1", "COLL00090032": "2", "COLL00090037": "2", "COLL00090038": "5", "COLL00090039": "2",
-    "COLL00090040": "8", "COLL00090041": "19", "COLL00090042": "2", "COLL00090043": "2", "COLL00090044": "1",
-    "COLL00090045": "5", "COLL00090046": "19", "COLL00090047": "19", "COLL00090048": "2",
+    "COLL00090001": "5", "COLL00090002": "2", "COLL00090004": "1", "COLL00090007": "2", "COLL00090034": "5",
+    "COLL00090008": "2", "COLL00090010": "5", "COLL00090012": "2", "COLL00090035": "5", "COLL00090013": "1",
+    "COLL00090014": "2", "COLL00090016": "5", "COLL00090017": "5", "COLL00090021": "2", "COLL00090023": "2",
+    "COLL00090024": "2", "COLL00090036": "2", "COLL00090025": "2", "COLL00090026": "1", "COLL00090027": "8",
+    "COLL00090028": "1", "COLL00090029": "2", "COLL00090031": "1", "COLL00090032": "2", "COLL00090037": "2",
+    "COLL00090038": "5", "COLL00090039": "2", "COLL00090040": "8", "COLL00090042": "2", "COLL00090043": "2",
+    "COLL00090044": "1", "COLL00090045": "5", "COLL00090048": "2",
 }
 # Answers in the Check and correct sheet: (Collateral ID, row, field, value, why)
 CHECK_ANSWERS = [
@@ -2207,8 +2207,9 @@ def main():
              "Every loan is active (Loan Status A); there are no cancelled (X) or closed (C) loans.", "",
              "COLLATERAL also has the columns someone fills by hand (Father Name, Type of Mortgage, Structure "
              "Type, Survey No., Project Name). They are filled for the generated records and blank for the "
-             "hand-made cases, which test the usual sources: there the asset sub-type and the father's names are "
-             "typed in the required-details file (the tool never guesses the sub-type).", "",
+             "hand-made cases, which test the usual sources: there the father's names, and the asset sub-type of "
+             "everything but the plots (a PLOT is land without structure), are typed in the required-details file "
+             "(the tool never guesses the sub-type from the address).", "",
              "`Dummy required details answers.xlsx` holds what a person would type in the required-details file "
              "(every individual's gender and father's / mother's name, and the values the hand-made cases leave "
              "out); `dev_tools/fill_dummy_required_details.py` types it in after step 1.", ""]

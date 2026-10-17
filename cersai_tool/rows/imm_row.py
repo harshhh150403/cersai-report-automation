@@ -127,14 +127,16 @@ def col_04_asset_type_others(c, row):
 #   when the extract has it and the cell is filled: "Structure with Land",
 #   "Structure without Land", "Land without Structure" (or "Unidentified"), or
 #   the code itself.
+#   Without it, a collateral whose COLLATERAL Property Type is PLOT is land:
+#   "Land without Structure".
 # Rules: the code depends on the asset type (column 3), from the
 #   ASSET_SUB_TYPE_ID master: Residential 1/2/3, Commercial 4/5/6, Other 7/8/19.
-#   It is never guessed from the address, the title report or the property
-#   type: the unit words ("Flat", "Door No.", "Property bearing No.") proved
-#   unreliable. Other wording in the column is reported, not guessed at.
+#   Other sub-types are never guessed from the address or the title report: the
+#   unit words ("Flat", "Door No.", "Property bearing No.") proved unreliable.
+#   Other wording in the column is reported, not guessed at.
 # If it can't be found: left blank and asked for in the required-details file.
-#   When the column names a structure but the asset type is not known yet, the
-#   code is worked out once ASSET_TYPE_ID is typed.
+#   When the structure is known (from the column, or PLOT) but the asset type
+#   is not known yet, the code is worked out once ASSET_TYPE_ID is typed.
 def col_05_asset_sub_type_id(c, row):
     asset_type = row["ASSET_TYPE_ID"].value
     allowed = c.masters.sub_types_for(asset_type)
@@ -159,6 +161,13 @@ def col_05_asset_sub_type_id(c, row):
                    f"COLLATERAL Structure Type '{column}' is not understood (write Structure with Land, "
                    "Structure without Land or Land without Structure)")
         c.issue("warning", "COLLATERAL columns", problem)
+    if c.bundle["property_type"] == "PLOT":
+        if not asset_type:
+            return blank("ASSET_SUB_TYPE_ID", "Land without Structure (COLLATERAL Property Type PLOT): worked out "
+                                              "once the asset type (ASSET_TYPE_ID) is typed")
+        code = c.masters.sub_type_id(asset_type, "Land without Structure")
+        if code:
+            return ok("ASSET_SUB_TYPE_ID", code, SRC_LMS, "Land without Structure (COLLATERAL Property Type PLOT)")
     why = f". {problem}" if problem else ""
     if not asset_type:
         return missing("ASSET_SUB_TYPE_ID", f"type the asset type (ASSET_TYPE_ID) and the sub-type that goes "

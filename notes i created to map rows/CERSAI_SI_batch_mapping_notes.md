@@ -351,7 +351,7 @@ The LMS source listed first is used whenever it gives a usable value. "Title rep
 | 2 | C | ASSET_CATEGORY_ID | M | Constant | `1` (Immovable) | |
 | 3 | D | ASSET_TYPE_ID | M | COLLATERAL `Property Type` (never blank); required details override | Mapping in §8.7. For `PLOT` (35 collaterals), use title report item 2 "Nature of immovable property" to choose: `Residential` → 1, `Commercial` (also the typo `Commerical`) → 2; otherwise left blank and asked for (no type assumed). | 1, 2 or 3 |
 | 4 | E | ASSET_TYPE_OTHERS | C | Derived from `Property Type`; required details override | Only when the type is 3, e.g. `Industrial`, `Mixed Usage` | ≤ 50, restricted chars |
-| 5 | F | ASSET_SUB_TYPE_ID | M | COLLATERAL `Structure Type` (hand-filled column, when present); else required details. **Never guessed** from the address, the title report or Property Type (decided 2026-10-17: the unit words proved inaccurate) | "Structure with Land" (1 / 4 / 7), "Structure without Land" (2 / 5 / 8), "Land without Structure" (3 / 6 / 19), by asset type. e.g. an office in a building (Commercial) = `5` | Must belong to ASSET_TYPE_ID |
+| 5 | F | ASSET_SUB_TYPE_ID | M | COLLATERAL `Structure Type` (hand-filled column, when present); else "Land without Structure" for Property Type `PLOT`; else required details. **Never guessed** from the address or the title report (decided 2026-10-17: the unit words proved inaccurate) | "Structure with Land" (1 / 4 / 7), "Structure without Land" (2 / 5 / 8), "Land without Structure" (3 / 6 / 19), by asset type. e.g. an office in a building (Commercial) = `5` | Must belong to ASSET_TYPE_ID |
 | 6 | G | ASSET_UNIQUE_ID | O | COLLATERAL `Global collateral No` (proposed) | e.g. `CMS00260877`, or blank. **The demo omits this column entirely.** | Rule is "**" (undefined); keep it alphanumeric |
 | 7 | H | ASSET_DESCRIPTION | M | Built from the LMS parts (property type, unit, project); missing parts from title report item 1; required details override | `<type> <unit kind> <house no> <project>`, e.g. `COMMERCIAL UNIT 21 YASHODHAM BUSINESS CSL`; with no unit number, the plot number (`PLOT NO 45`); cut at a word boundary | ≤ 100, restricted chars |
 | 8 | I | SURVEY_NUMBER | C | COLLATERAL `Survey No.` (hand-filled column, when present); else regex on the property `Full Address`; **title report item 1 when the address has none** (39% of active addresses have neither a survey nor a plot number); required details override | Numbers after `Survey No`, `S No`, `Sy No`, `CTS No`, `C.S. No`, `Khasra/Kh No`, `Gat No`, `Khata/Khewat No`, `Mustatil/Killa`, joined with `^`. If old and new survey numbers are both given, use the new one plus its Hissa (`12/2`). | ≤ 1000; separator question in §11 Q15 |
@@ -542,7 +542,7 @@ A value counts as found only when its pattern matches cleanly; otherwise treat i
 
 **Property Type → ASSET_TYPE_ID / sub-type.** This is a *proposed default* that the business must confirm (§11 Q21); the required-details file always overrides it.
 
-| LMS `Property Type` | ASSET_TYPE_ID | ASSET_TYPE_OTHERS | Usual sub-type (a guide for whoever fills it; not applied by the tool) |
+| LMS `Property Type` | ASSET_TYPE_ID | ASSET_TYPE_OTHERS | Usual sub-type (a guide for whoever fills it; the tool applies only the PLOT rule) |
 |---|---|---|---|
 | RESIDENTIAL (998) | 1 | — | Flat/apartment → 2 (without land); independent/row house/bungalow → 1 (with land) |
 | COMMERCIAL (201) | 2 | — | Office/shop/unit/gala in a building → 5; independent building → 4 |
@@ -551,7 +551,7 @@ A value counts as found only when its pattern matches cleanly; otherwise treat i
 | PLOT (35) | Depends on use: 1, 2 or 3 | If 3: `Plot` | Land without structure: 3, 6 or 19 |
 | PG (1) | 1 | — | 1 or 2 |
 
-"Structure without Land" fits units in multi-storey buildings; "Structure with Land" fits independent structures; "Land without Structure" fits plots. **The tool does not apply these rules** (decided 2026-10-17): working the sub-type out from the address words proved inaccurate, so it comes only from COLLATERAL `Structure Type` (hand-filled) or the required-details file.
+"Structure without Land" fits units in multi-storey buildings; "Structure with Land" fits independent structures; "Land without Structure" fits plots. **The tool applies only the PLOT rule** (decided 2026-10-17): working the sub-type out from the address words proved inaccurate, so it comes from COLLATERAL `Structure Type` (hand-filled), "Land without Structure" for a `PLOT`, or the required-details file.
 
 ---
 
@@ -568,7 +568,7 @@ A value counts as found only when its pattern matches cleanly; otherwise treat i
 | Survey/Plot No | IMM.SURVEY_NUMBER / IMM.PLOT_NUMBER | Per collateral | LMS address; title report item 1 when the address has neither (39% of active addresses) | Keep them as **two columns**: they are different fields with different rules. |
 | Asset Area | IMM.ASSET_AREA (+ ASSET_AREA_UNIT) | Per collateral | COLLATERAL `Carpert Area` (sq ft, to confirm); title report item 1, with its unit, when blank | Add an "Asset Area Unit" column for manual overrides (the unit is required whenever an area is given). |
 | Registration no | Probably BOR.BORROWER_REGISTRATION_NUMBER (the demo's BOR placeholder says "Registration Number") | **Per borrower**, not per SI | Only the **property deed's** registration number (title report item 5), not a borrower's CIN/LLPIN | If you meant the deed number, it can be read automatically; **confirm (§11 Q14).** |
-| asset_sub_type | IMM.ASSET_SUB_TYPE_ID | Per collateral | COLLATERAL `Structure Type` (hand-filled column, when present); else typed in the required-details file. Never derived from the address or the title report (decided 2026-10-17). | — |
+| asset_sub_type | IMM.ASSET_SUB_TYPE_ID | Per collateral | COLLATERAL `Structure Type` (hand-filled column, when present); else "Land without Structure" for a `PLOT`; else typed in the required-details file. Never derived from the address or the title report (decided 2026-10-17). | — |
 
 ### 9.2 Missing from the draft (cannot be automated from the current extracts)
 
